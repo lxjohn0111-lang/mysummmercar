@@ -197,7 +197,11 @@ export class Game {
   closeModal() {
     this.modalOpen = false; this.uiBlocking = false;
     this.ui.modal = null;
-    if (!this.player.dead) { this.input.lock(); this.paused = false; }
+    if (!this.player.dead) {
+      this.input.lock(); this.paused = false;
+      // browsers may refuse pointer lock right after Esc; fall back to the click-to-continue pause screen
+      setTimeout(() => { if (!this.input.locked && !this.paused && !this.modalOpen && !this.player.dead) this.pause(); }, 700);
+    }
     this.last = performance.now();
   }
 
