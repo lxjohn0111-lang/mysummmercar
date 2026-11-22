@@ -150,7 +150,7 @@ function buildGarage(game) {
   const R2 = new Builder(game, P.garage.x, y, P.garage.z, Math.PI / 2);
   R2.gable(D + 0.4, W + 0.4, H, 1.6, 0.5, M.roof, M.redBoards);
   // Big up-and-over door
-  const doorPivot = new THREE.Group(); doorPivot.position.set(0, 2.8, D / 2);
+  const doorPivot = new THREE.Group(); doorPivot.position.set(0, 2.8, D / 2); doorPivot.userData.noBatch = true;
   const panel = new THREE.Mesh(boxUV(3.8, 2.8, 0.06, 1.5), M.whitePaint); panel.position.set(0, -1.4, 0); panel.castShadow = true;
   doorPivot.add(panel);
   for (let i = 0; i < 7; i++) { const s = new THREE.Mesh(new THREE.BoxGeometry(3.8, 0.03, 0.02), M.white); s.position.set(0, -0.2 - i * 0.4, 0.04); doorPivot.add(s); }
@@ -260,6 +260,7 @@ function buildSauna(game) {
   const hull = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.55, 3.6, 12, 1, true, 0, Math.PI), new THREE.MeshStandardMaterial({ color: 0x2a5a3a, roughness: 0.6, side: THREE.DoubleSide, map: tex('planks_raw.jpg') }));
   hull.rotation.z = Math.PI / 2; hull.rotation.y = Math.PI / 2; hull.scale.set(1, 1, 0.55); boat.add(hull);
   boat.position.copy(DB.w(2.1, 0.08, 4)); boat.rotation.y = ry + 0.15;
+  boat.userData.noBatch = true;
   game.scene.add(boat); game.floaters.push({ obj: boat, base: boat.position.y, ph: 0 });
 }
 

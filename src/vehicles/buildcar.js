@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import { Vehicle } from './vehicle.js';
-import { buildBodyGeometries, centreGeo, WHEELS } from './carbody.js';
+import { centreGeo, WHEELS } from './carbody.js';
+import { buildBody, SPECS, paintMaterial, bodyMats } from './bodygen.js';
+import * as D from './details.js';
+import { mergeLocal } from '../core/batch.js';
 import { PARTS, SLOTS, PANEL_TYPES, PANEL_INFO, partMats } from './parts.js';
 import { clamp, rand, lerp, damp, pick } from '../core/util.js';
 import { audio } from '../core/audio.js';
@@ -51,68 +54,97 @@ export class BuildCar extends Vehicle {
 
   // ---------------------------------------------------------------- body model
   buildModel() {
-    const geos = buildBodyGeometries();
-    this.paintMat = new THREE.MeshPhysicalMaterial({ color: this.paint, roughness: 0.32, metalness: 0.15, clearcoat: 1, clearcoatRoughness: 0.06, side: THREE.DoubleSide });
-    const glass = new THREE.MeshPhysicalMaterial({ color: 0x9ab0b8, roughness: 0.03, metalness: 0, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false, envMapIntensity: 1.5 });
-    const P = partMats();
+    const spec = { ...SPECS.ruska, layout: { ...SPECS.ruska.layout, handles: 0 } };
+    const body = buildBody(spec, { res: 0.028, panels: true });
+    this.bodyGen = body.gen;
+    const BM = bodyMats();
+    this.paintMat = paintMaterial(this.paint);
+    this.paintPlain = new THREE.MeshPhysicalMaterial({ color: this.paint, metalness: 0.35, roughness: 0.4, clearcoat: 1, clearcoatRoughness: 0.06, side: THREE.DoubleSide });
     this.bodyMeshes = [];
     const shell = new THREE.Group();
-    for (const [name, g] of Object.entries(geos)) {
-      if (PANEL_TYPES.some((t) => name === t || name === t.replace('door', 'door'))) continue;
-      if (name.startsWith('door') || name.startsWith('fender') || name === 'hood' || name === 'trunk') continue;
-      let mat = this.paintMat;
-      if (name.includes('Glass') || name === 'windshield' || name === 'rearGlass') mat = glass;
-      if (name === 'pillar') mat = this.paintMat;
-      if (name === 'nosePanel') mat = P.blackMatte;
-      const m = new THREE.Mesh(g, mat);
-      m.castShadow = !mat.transparent; m.receiveShadow = true;
-      if (mat.transparent) m.renderOrder = 5;
-      shell.add(m); this.bodyMeshes.push(m);
-    }
+    const add = (geo, mat, { shadow = true, order = 0, dent = false } = {}) => {
+      if (!geo) return null;
+      const m = new THREE.Mesh(geo, mat);
+      m.castShadow = shadow; m.receiveShadow = true; m.renderOrder = order;
+      shell.add(m);
+      if (dent) this.bodyMeshes.push(m);
+      return m;
+    };
+    add(body.groups.paint, this.paintMat, { dent: true });
+    add(body.capFront, this.paintMat, { dent: true });
+    add(body.capRear, this.paintMat, { dent: true });
+    add(body.groups.glass, BM.glass, { shadow: false, order: 5 });
+    add(body.under, BM.under);
+    for (const w of body.wells) add(w, BM.under);
+    add(body.trims.chrome, BM.chrome);
+    add(body.trims.black, BM.black);
     this.root.add(shell);
     this.shell = shell;
+    mergeLocal(shell);
+    this.bodyMeshes = shell.children.filter((m) => m.material === this.paintMat);
     this.panelGeos = {};
     for (const t of PANEL_TYPES) {
-      const [g, c] = centreGeo(geos[t]);
+      const [g, c] = centreGeo(body.panels[t]);
       this.panelGeos[t] = { geo: g, centre: c };
     }
     this.addStaticDetail();
   }
 
   addStaticDetail() {
-    const P = partMats(), M = mats();
+    const P = partMats(), M = mats(), DM = D.detailMats(), gen = this.bodyGen;
     const dark = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.7, metalness: 0.3 });
-    const add = (g, m, x, y, z, rx = 0, ry = 0, rz = 0) => { const o = new THREE.Mesh(g, m); o.position.set(x, y, z); o.rotation.set(rx, ry, rz); o.castShadow = true; o.receiveShadow = true; this.root.add(o); return o; };
-    // engine bay: firewall, inner fenders, radiator support, strut towers
-    add(new THREE.BoxGeometry(1.4, 0.55, 0.04), this.paintMat, 0, 0.58, 0.93);
+    const detail = new THREE.Group(); this.root.add(detail);
+    const add = (g, m, x, y, z, rx = 0, ry = 0, rz = 0) => { const o = new THREE.Mesh(g, m); o.position.set(x, y, z); o.rotation.set(rx, ry, rz); o.castShadow = true; o.receiveShadow = true; detail.add(o); return o; };
+    // engine bay: firewall, inner fenders, strut towers, radiator support, cowl vent
+    add(new THREE.BoxGeometry(1.42, 0.5, 0.03), this.paintPlain, 0, 0.56, 0.92);
     for (const s of [1, -1]) {
-      add(new THREE.BoxGeometry(0.03, 0.4, 1.0), this.paintMat, s * 0.66, 0.55, 1.45);
-      add(new THREE.CylinderGeometry(0.11, 0.13, 0.22, 12), this.paintMat, s * 0.6, 0.62, 1.22);
+      add(new THREE.BoxGeometry(0.03, 0.36, 1.05), this.paintPlain, s * 0.67, 0.56, 1.46);
+      add(new THREE.CylinderGeometry(0.1, 0.12, 0.2, 14), this.paintPlain, s * 0.6, 0.6, 1.22);
     }
-    add(new THREE.BoxGeometry(1.3, 0.08, 0.06), this.paintMat, 0, 0.82, 1.92);
-    add(new THREE.BoxGeometry(1.3, 0.08, 0.06), this.paintMat, 0, 0.36, 1.92);
-    // interior: carpet floor, tunnel, headliner, pedals, handbrake, door cards
-    add(new THREE.BoxGeometry(1.44, 0.02, 2.3), P.carpet, 0, 0.27, -0.25);
-    add(new THREE.BoxGeometry(0.26, 0.18, 1.8), P.carpet, 0, 0.35, -0.1);
-    add(new THREE.BoxGeometry(1.2, 0.015, 1.4), new THREE.MeshStandardMaterial({ color: 0xc8c0a8, roughness: 1 }), 0, 1.3, -0.25);
-    for (const [x, h] of [[0.48, 0.0], [0.36, 0.02], [0.26, 0.0]]) add(new THREE.BoxGeometry(0.07, 0.1, 0.02), dark, x, 0.42 + h, 0.72, 0.5);
-    add(new THREE.CylinderGeometry(0.012, 0.012, 0.22, 6), dark, 0.1, 0.48, -0.15, -1.1);
-    // trunk floor & spare wheel well
-    add(new THREE.BoxGeometry(1.3, 0.02, 0.6), P.carpet, 0, 0.5, -1.7);
-    // under body: floor pan & sills (dark)
-    add(new THREE.BoxGeometry(1.5, 0.03, 3.4), dark, 0, 0.23, 0);
-    // dashboard placeholder light for gauges
-    // interior light
-    // rear view mirror
-    add(new THREE.BoxGeometry(0.2, 0.06, 0.02), new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.02 }), 0, 1.24, 0.26);
-    // badge
-    const badge = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.05), new THREE.MeshStandardMaterial({ map: badgeTex(), transparent: true, metalness: 0.9, roughness: 0.2 }));
-    badge.position.set(0.0, 0.88, -2.0); badge.rotation.y = Math.PI; this.root.add(badge);
+    add(new THREE.BoxGeometry(1.3, 0.06, 0.05), this.paintPlain, 0, 0.76, 1.97);
+    add(new THREE.BoxGeometry(1.3, 0.06, 0.05), this.paintPlain, 0, 0.36, 1.97);
+    const vent = add(new THREE.BoxGeometry(1.1, 0.012, 0.05), DM.black, 0, 0.875, 0.915);
+    for (let i = 0; i < 18; i++) add(new THREE.BoxGeometry(0.008, 0.014, 0.05), DM.chrome, -0.52 + i * 0.061, 0.878, 0.915);
+    // wipers lying at the base of the windshield
+    for (const x of [0.42, -0.08]) { const w = D.wiper(0.46); w.position.set(x, 0.885, 0.875); w.rotation.set(-0.55, Math.PI, 0); detail.add(w); }
+    // interior: carpet, tunnel, headliner, pedals, handbrake, sun visors, rear-view mirror, door sills
+    add(new THREE.BoxGeometry(1.44, 0.02, 2.3), P.carpet, 0, 0.255, -0.25);
+    add(new THREE.BoxGeometry(0.26, 0.16, 1.8), P.carpet, 0, 0.33, -0.1);
+    add(new THREE.BoxGeometry(1.12, 0.012, 0.92), new THREE.MeshStandardMaterial({ color: 0xd8d0bc, roughness: 1 }), 0, 1.272, -0.1);
+    for (const [x, h, w] of [[0.5, 0.0, 0.07], [0.38, 0.02, 0.07], [0.26, 0.0, 0.1]]) { add(new THREE.BoxGeometry(w, 0.1, 0.02), DM.rubber, x, 0.4 + h, 0.68, 0.5); add(new THREE.CylinderGeometry(0.006, 0.006, 0.2, 6), DM.chrome, x, 0.5 + h, 0.72, 0.4); }
+    add(new THREE.CylinderGeometry(0.012, 0.012, 0.24, 6), dark, 0.1, 0.45, -0.18, -1.1);
+    add(new THREE.BoxGeometry(0.035, 0.03, 0.07), DM.plastic, 0.1, 0.56, -0.12, -1.1);
+    for (const x of [0.34, -0.34]) { const v = add(new THREE.BoxGeometry(0.3, 0.012, 0.12), new THREE.MeshStandardMaterial({ color: 0xc8c0b0, roughness: 1 }), x, 1.258, 0.29, 0.08); }
+    add(new THREE.BoxGeometry(0.2, 0.055, 0.02), DM.plastic, 0, 1.215, 0.31);
+    add(new THREE.BoxGeometry(0.18, 0.042, 0.004), new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.02 }), 0, 1.215, 0.298);
+    add(new THREE.CylinderGeometry(0.006, 0.006, 0.05, 6), DM.chrome, 0, 1.24, 0.3);
+    // gear lever boot
+    add(new THREE.ConeGeometry(0.06, 0.08, 12), DM.rubber, 0, 0.44, 0.18);
+    // trunk floor & spare wheel
+    add(new THREE.BoxGeometry(1.3, 0.02, 0.62), P.carpet, 0, 0.5, -1.7);
+    const spare = D.wheel('hubcap', 0.29, 0.168); spare.rotation.z = Math.PI / 2; spare.position.set(0.25, 0.62, -1.7); spare.scale.setScalar(0.92); detail.add(spare);
+    // badges and script on the rear panel
+    const badge = new THREE.Mesh(new THREE.PlaneGeometry(0.24, 0.06), new THREE.MeshStandardMaterial({ map: badgeTex(), transparent: true, metalness: 0.9, roughness: 0.2 }));
+    badge.position.set(-0.3, 0.83, -2.088); badge.rotation.y = Math.PI; detail.add(badge);
+    const gt = new THREE.Mesh(new THREE.PlaneGeometry(0.14, 0.04), new THREE.MeshStandardMaterial({ map: scriptTex('1300 GT'), transparent: true, metalness: 0.9, roughness: 0.2 }));
+    const fp = gen.S(1.62, 0.36), fn = gen.normal(1.62, 0.36);
+    gt.position.set(fp.x + fn.x * 0.003, fp.y, fp.z); gt.rotation.y = Math.PI / 2; this.fenderBadgeL = gt;
+    // antenna
+    add(new THREE.CylinderGeometry(0.003, 0.004, 0.75, 5), DM.chrome, -0.7, 1.15, 1.55);
+    // exhaust tip
+    add(new THREE.CylinderGeometry(0.03, 0.03, 0.12, 14, 1, true), DM.chrome, 0.38, 0.27, -2.08, Math.PI / 2);
+    // fuel filler cap (left rear quarter)
+    const cp = gen.S(-1.58, 0.42), cn = gen.normal(-1.58, 0.42);
+    const cap = add(new THREE.CylinderGeometry(0.05, 0.05, 0.012, 20), DM.chrome, cp.x + cn.x * 0.004, cp.y, cp.z, 0, 0, Math.PI / 2);
+    mergeLocal(detail);
+    // contact shadow
+    this.root.add(contactShadow(1.9, 4.5));
   }
 
   setPaint(color) {
     this.paint = color;
     this.paintMat.color.setHex(color);
+    this.paintPlain.color.setHex(color);
     for (const inst of this.parts.values()) if (inst.panel && inst.mesh.userData.paintMat) inst.mesh.userData.paintMat.color.setHex(color);
   }
 
@@ -128,18 +160,35 @@ export class BuildCar extends Vehicle {
   }
   buildPanel(t) {
     const g = new THREE.Group();
-    const mat = this.paintMat.clone();
+    const mat = paintMaterial(this.paint);
     const m = new THREE.Mesh(this.panelGeos[t].geo, mat); m.castShadow = true; m.receiveShadow = true;
     g.add(m);
     g.userData.paintMat = mat;
+    const c = this.panelGeos[t].centre, gen = this.bodyGen, DM = D.detailMats();
+    const at = (z, tt, side, off = 0) => { const p = gen.S(z, tt), n = gen.normal(z, tt); return new THREE.Vector3(p.x * side + n.x * side * off, p.y + n.y * off, p.z + n.z * off).sub(c); };
     if (t.startsWith('door')) {
       const s = t === 'doorL' ? 1 : -1;
-      const card = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.42, 1.0), partMats().vinyl);
-      card.position.set(-s * 0.05, 0.02, 0.05); g.add(card);
-      const handle = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.025, 0.12), partMats().chrome); handle.position.set(s * 0.015, 0.17, -0.38); g.add(handle);
+      // inner door card with armrest and window winder
+      const card = new THREE.Mesh(roundBoxGeo(0.03, 0.44, 1.2), partMats().vinyl);
+      card.position.copy(at(0.2, 0.3, s, -0.06)); g.add(card);
+      const arm = new THREE.Mesh(roundBoxGeo(0.07, 0.05, 0.36), DM.plastic); arm.position.copy(at(0.05, 0.35, s, -0.1)); g.add(arm);
+      const crank = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.01, 14), DM.chrome); crank.rotation.z = Math.PI / 2; crank.position.copy(at(0.1, 0.26, s, -0.09)); g.add(crank);
+      // exterior pull handle and key lock near the rear edge
+      const hg = new THREE.CapsuleGeometry(0.012, 0.11, 3, 8); hg.rotateX(Math.PI / 2);
+      const h = new THREE.Mesh(hg, DM.chrome); h.position.copy(at(-0.33, 0.455, s, 0.012)); g.add(h);
+      const key = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.01, 10), DM.chrome); key.rotation.z = Math.PI / 2; key.position.copy(at(-0.2, 0.455, s, 0.006)); g.add(key);
+    }
+    if (t === 'fenderL' && this.fenderBadgeL) { const b = this.fenderBadgeL.clone(); b.position.sub(c); g.add(b); }
+    if (t.startsWith('fender')) {
+      const s = t === 'fenderL' ? 1 : -1;
+      const ind = new THREE.Mesh(new THREE.SphereGeometry(0.03, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), DM.amber);
+      ind.scale.set(1, 0.5, 1.5); ind.rotation.z = -s * Math.PI / 2; ind.position.copy(at(1.82, 0.32, s, 0.001)); g.add(ind);
     }
     if (t === 'trunk') {
-      const lock = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.01, 10), partMats().chrome); lock.rotation.x = Math.PI / 2; g.add(lock);
+      const lock = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.012, 14), DM.chrome); lock.rotation.x = Math.PI / 2; lock.position.copy(at(-2.05, 0.995, 1, 0.004)); g.add(lock);
+    }
+    if (t === 'hood') {
+      const orn = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.012, 0.07), DM.chrome); orn.position.copy(at(1.98, 1.0, 1, 0.005)); g.add(orn);
     }
     return g;
   }
@@ -150,6 +199,7 @@ export class BuildCar extends Vehicle {
     const inst = { uid: uid ?? this.uidSeq++, defId, def, slot: null, cond, tight: 0, data: { ...data }, panel: !!def.panel };
     if (uid) this.uidSeq = Math.max(this.uidSeq, uid + 1);
     inst.mesh = def.build(inst);
+    mergeLocal(inst.mesh);
     inst.mesh.userData.partInst = inst;
     inst.mesh.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o.userData.partInst = inst; } });
     if (defId.startsWith('panel:') && this.paint !== undefined && inst.mesh.userData.paintMat) inst.mesh.userData.paintMat.color.setHex(data.color ?? this.paint);
@@ -723,6 +773,25 @@ export class BuildCar extends Vehicle {
   }
 }
 
+function roundBoxGeo(w, h, d) { return new THREE.BoxGeometry(w, h, d, 2, 2, 2); }
+function scriptTex(text) {
+  const c = document.createElement('canvas'); c.width = 256; c.height = 72;
+  const g = c.getContext('2d');
+  g.fillStyle = '#e0e0e0'; g.font = 'italic bold 44px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(text, 128, 38);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+export function contactShadow(w, l) {
+  const c = document.createElement('canvas'); c.width = 64; c.height = 128;
+  const g = c.getContext('2d');
+  const grd = g.createRadialGradient(32, 64, 4, 32, 64, 60);
+  grd.addColorStop(0, 'rgba(0,0,0,0.75)'); grd.addColorStop(0.55, 'rgba(0,0,0,0.45)'); grd.addColorStop(1, 'rgba(0,0,0,0)');
+  g.save(); g.scale(1, 1); g.fillStyle = grd; g.fillRect(0, 0, 64, 128); g.restore();
+  const t = new THREE.CanvasTexture(c);
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, l), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, opacity: 0.85, polygonOffset: true, polygonOffsetFactor: -4 }));
+  m.rotation.x = -Math.PI / 2; m.position.y = 0.02; m.renderOrder = 1; m.name = 'contactShadow';
+  return m;
+}
 function badgeTex() {
   const c = document.createElement('canvas'); c.width = 256; c.height = 64;
   const g = c.getContext('2d');

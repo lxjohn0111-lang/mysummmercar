@@ -14,6 +14,7 @@ import { SkySystem } from '../world/sky.js';
 import { buildLocations } from '../world/locations.js';
 import { mailbox as mailboxProp } from '../world/props.js';
 import { mats } from '../world/mats.js';
+import { batchStatic } from '../core/batch.js';
 import { P, MAP_SIZE, HALF, WATER_LEVEL, SITES } from '../world/layout.js';
 import { Player } from './player.js';
 import { Items } from './items.js';
@@ -102,6 +103,7 @@ export class Game {
     this.setLoad(0.3, 'Laying gravel roads…');
     this.terrain.createMesh(this.scene);
     this.terrain.createCollider(this.physics);
+    const before = new Set(this.scene.children);
     buildRoads(this);
     await this.frame();
     this.setLoad(0.38, 'Lighting the sky…');
@@ -116,6 +118,9 @@ export class Game {
     this.ui = new UI(this);
     this.actions = new Actions(this);
     buildLocations(this);
+    const statics = this.scene.children.filter((o) => !before.has(o) && o !== this.water?.mesh);
+    const bs = batchStatic(this.scene, statics);
+    console.log('[batch] static meshes merged', bs.merged, '->', bs.meshes);
     await this.frame();
     this.setLoad(0.72, 'Waking up the neighbours…');
     this.particles = new Particles(this.scene);

@@ -66,7 +66,7 @@ function buildSpruce(seed, lod) {
       const a = rot + k / n * Math.PI * 2 + (rnd() - 0.5) * 0.4;
       const droop = 0.18 + 0.35 * (1 - t) + rnd() * 0.15;
       const w = L * (lod ? 1.35 : 1.2), h = L * (lod ? 1.0 : 0.85);
-      for (const tilt of lod ? [0.45, -0.7] : [0.25, -0.55, 1.2]) {
+      for (const tilt of lod ? [0.2] : [0.25, -0.55, 1.2]) {
         let g = cardGeo(w, h);
         g.rotateX(Math.PI / 2 + tilt);
         g.rotateZ(-droop);
@@ -280,7 +280,7 @@ export class Vegetation {
       };
       return {
         l0t: mk(A.l0.trunk, A.barkMat, true), l0f: mk(A.l0.fol, A.leafMat, true),
-        l1t: mk(A.l1.trunk, A.barkMat, true), l1f: mk(A.l1.fol, A.leafMat, true),
+        l1t: mk(A.l1.trunk, A.barkMat, false), l1f: mk(A.l1.fol, A.leafMat, false),
         imp: mk(A.imp.geo, A.imp.mat, false),
       };
     });
@@ -354,13 +354,13 @@ export class Vegetation {
     const T = this.game.terrain, ph = this.game.physics, R = ph.R;
     const rnd = mulberry32(999);
     const geos = [];
-    for (let v = 0; v < 4; v++) {
-      const g = new THREE.IcosahedronGeometry(1, 3);
+    for (let v = 0; v < 8; v++) {
+      const g = new THREE.IcosahedronGeometry(1, v < 4 ? 2 : 1);
       const p = g.attributes.position;
       for (let i = 0; i < p.count; i++) {
         const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
         const n = 1 + fbm2(x * 1.3 + v * 10, z * 1.3 + y * 0.7, 4, v) * 0.35 + perlin2(x * 4 + v, y * 4 + z * 2, v + 9) * 0.06;
-        p.setXYZ(i, x * n * 1.15, y * n * (0.62 + v * 0.06), z * n);
+        p.setXYZ(i, x * n * 1.15, y * n * (0.62 + (v % 4) * 0.06), z * n);
       }
       g.computeVertexNormals();
       geos.push(g);
@@ -392,7 +392,7 @@ export class Vegetation {
       const big = rnd() < 0.12;
       const s = big ? 1.6 + rnd() * 2.4 : 0.3 + rnd() * 0.8;
       const h = T.getHeight(x, z);
-      const v = Math.floor(rnd() * geos.length);
+      const v = Math.floor(rnd() * 4) + (s > 1.2 ? 0 : 4);
       lists[v].push([x, h - s * 0.25, z, s, rnd() * 6.28]);
       if (s > 0.7) {
         const d = R.ColliderDesc.ball(s * 0.85).setTranslation(x, h - s * 0.25, z);
@@ -405,7 +405,7 @@ export class Vegetation {
       const L = lists[i];
       const im = new THREE.InstancedMesh(g, mat, L.length);
       L.forEach(([x, y, z, s, r], j) => { q.setFromEuler(new THREE.Euler(0, r, (hash2(j, i) - 0.5) * 0.3)); m4.compose(new THREE.Vector3(x, y, z), q, new THREE.Vector3(s, s, s)); im.setMatrixAt(j, m4); });
-      im.castShadow = true; im.receiveShadow = true;
+      im.castShadow = i < 4; im.receiveShadow = true;
       scene.add(im);
     });
   }
@@ -418,16 +418,18 @@ export class Vegetation {
     this.grassRadius = R;
     const base = new THREE.InstancedBufferGeometry();
     const quads = [];
-    for (const a of [0, Math.PI / 3, -Math.PI / 3]) { const q = new THREE.PlaneGeometry(1, 1, 1, 2); q.translate(0, 0.5, 0); q.rotateY(a); quads.push(q); }
+    for (const a of [0, Math.PI / 2]) { const q = new THREE.PlaneGeometry(1, 1, 1, 2); q.translate(0, 0.5, 0); q.rotateY(a); quads.push(q); }
     const g = mergeGeos(quads);
     base.index = g.index; base.attributes.position = g.attributes.position; base.attributes.uv = g.attributes.uv; base.attributes.normal = g.attributes.normal;
-    const offs = new Float32Array(n * n * 3);
-    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
-      const o = (j * n + i) * 3;
-      offs[o] = (i - n / 2) * sp; offs[o + 1] = (j - n / 2) * sp; offs[o + 2] = Math.random();
-    }
+    // instances sorted by distance from the centre, so drawing fewer of them shrinks the radius
+    const cells = [];
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const x = (i - n / 2) * sp, z = (j - n / 2) * sp; const r = Math.hypot(x, z); if (r <= R) cells.push([x, z, r]); }
+    cells.sort((a, b) => a[2] - b[2]);
+    this.grassCells = cells;
+    const offs = new Float32Array(cells.length * 3);
+    cells.forEach(([x, z], k) => { offs[k * 3] = x; offs[k * 3 + 1] = z; offs[k * 3 + 2] = Math.random(); });
     base.setAttribute('aOff', new THREE.InstancedBufferAttribute(offs, 3));
-    base.instanceCount = n * n;
+    base.instanceCount = cells.length;
     const fieldsU = FIELDS.map((f) => new THREE.Vector4(f.x, f.z, f.w / 2, f.d / 2));
     const fieldType = FIELDS.map((f) => (f.crop === 'hay' ? 0 : f.crop === 'barley' ? 1 : 2));
     const mat = new THREE.MeshStandardMaterial({ map: tex('grass_card.png', { wrap: false }), alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.9 });
@@ -565,10 +567,15 @@ vGTint = tint * (1.05 + 0.6 * position.y) * 1.25; vGFade = fade;
   }
 
   setQuality(q) {
-    this.lod0Dist = [40, 60, 80, 110][q];
-    this.lod1Dist = [140, 200, 260, 320][q];
+    this.lod0Dist = [35, 50, 65, 90][q];
+    this.lod1Dist = [120, 170, 220, 280][q];
     this.maxDist = [600, 900, 1300, 1700][q];
-    if (this.grassUniforms) this.grassUniforms.uDensity.value = [0.35, 0.65, 1.0, 1.2][q];
+    if (this.grassUniforms) {
+      this.grassUniforms.uDensity.value = [0.5, 0.8, 1.0, 1.15][q];
+      const radius = [20, 28, 36, 46][q];
+      this.grassUniforms.uR.value = radius;
+      if (this.grassCells) { let k = 0; while (k < this.grassCells.length && this.grassCells[k][2] <= radius) k++; this.grass.geometry.instanceCount = k; }
+    }
     if (this.grass) this.grass.visible = q > 0 || true;
     this.lastLodPos.set(1e9, 0, 0);
   }

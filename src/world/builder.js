@@ -167,6 +167,7 @@ export class Builder {
   // Hinged door: returns door object with toggle()
   door(lx, lz, w, h, alongX, mat, { y0 = 0, hingeLeft = true, label = 'Door', locked = null } = {}) {
     const pivot = new THREE.Group();
+    pivot.userData.noBatch = true;
     pivot.position.set(lx + (alongX ? (hingeLeft ? -w / 2 : w / 2) : 0), y0, lz + (alongX ? 0 : (hingeLeft ? -w / 2 : w / 2)));
     const panel = new THREE.Mesh(boxUV(alongX ? w : 0.05, h, alongX ? 0.05 : w, 1.5), mat);
     panel.position.set(alongX ? (hingeLeft ? w / 2 : -w / 2) : 0, h / 2, alongX ? 0 : (hingeLeft ? w / 2 : -w / 2));

@@ -65,6 +65,7 @@ class AICar {
   honk() { if (this.honkT <= 0) { audio.play('horn', this.pos, 0.6); this.honkT = 3; } }
   place(dt) {
     this.honkT -= dt;
+    this.obj.visible = this.pos.distanceToSquared(this.game.camera.position) < 480 * 480;
     this.obj.position.copy(this.pos);
     this.obj.rotation.set(0, 0, 0);
     this.obj.rotation.order = 'YXZ';
