@@ -164,12 +164,12 @@ export class SkySystem {
     const overcast = smooth(clamp((W.clouds - 0.45) / 0.5, 0, 1));
 
     // daylight factor
-    this.daylight = smooth(clamp((elDeg + 6) / 14, 0, 1));
+    this.daylight = smooth(clamp((elDeg + 9.5) / 17, 0, 1));
     const golden = smooth(clamp(1 - Math.abs(elDeg - 3) / 12, 0, 1));
     // sun colour
     const warm = new THREE.Color(1.0, 0.55, 0.28), noon = new THREE.Color(1.0, 0.96, 0.9);
     this.sunLightColor.copy(noon).lerp(warm, golden * 0.85);
-    this.sunIntensity = 3.2 * smooth(clamp((elDeg + 1) / 10, 0, 1)) * (1 - overcast * 0.75) * (1 - W.rain * 0.3);
+    this.sunIntensity = 3.9 * smooth(clamp((elDeg + 1) / 10, 0, 1)) * (1 - overcast * 0.75) * (1 - W.rain * 0.3);
     this.sun.color.copy(this.sunLightColor);
     this.sun.intensity = this.sunIntensity + this.lightning * 6;
     // sky colours (for fog / water / clouds)
@@ -184,20 +184,20 @@ export class SkySystem {
     // Sky uniforms
     const su = this.sky.material.uniforms;
     su.sunPosition.value.copy(this.sunDir).multiplyScalar(4000);
-    su.turbidity.value = 4 + overcast * 8 + W.rain * 4;
-    su.rayleigh.value = 1.2 + golden * 1.2;
+    su.turbidity.value = 2.6 + overcast * 9 + W.rain * 4;
+    su.rayleigh.value = 1.0 + golden * 1.3;
     const fogC = this.horizonColor.clone().multiplyScalar(0.62 + golden * 0.2);
     su.uFogColor.value.copy(fogC);
     su.uDim.value = 1 - overcast * 0.6;
     g.scene.fog.color.copy(fogC);
-    g.scene.fog.density = (0.00085 + overcast * 0.0006 + W.rain * 0.0016 + (1 - this.daylight) * 0.0004) * (g.fogMul || 1);
+    g.scene.fog.density = (0.00062 + overcast * 0.0006 + W.rain * 0.0016 + (1 - this.daylight) * 0.0004) * (g.fogMul || 1);
 
     // Lights
     this.hemi.color.copy(this.zenithColor).lerp(new THREE.Color(1, 1, 1), 0.35);
     this.hemi.groundColor.setRGB(0.24, 0.26, 0.15);
-    this.hemi.intensity = (0.25 + this.daylight * 0.75) * (1 + this.lightning * 3) + overcast * 0.35 * this.daylight;
+    this.hemi.intensity = (0.42 + this.daylight * 0.6) * (1 + this.lightning * 3) + overcast * 0.35 * this.daylight;
     g.scene.environmentIntensity = 0.25 + this.daylight * 0.55;
-    g.renderer.toneMappingExposure = 0.62 + (1 - this.daylight) * 0.45;
+    g.renderer.toneMappingExposure = 0.78 + (1 - this.daylight) * 0.5;
 
     // shadow follows focus, snapped to texels
     const fp = focus;

@@ -137,7 +137,7 @@ export class UI {
     this.toolEl.style.display = v ? 'none' : 'block';
     // hints
     if (this.hintsShown) {
-      this.hintEl.innerHTML = v ? `<b>Driving</b> W/S gas/brake · A/D steer · Space handbrake<br>Shift/X gear up · Q/Z gear down · C clutch<br>I ignition (hold to crank) · K choke · L lights · B belt<br>H horn · R radio · V camera · E exit · Tab car status`
+      this.hintEl.innerHTML = v ? `<b>Driving</b> W/S gas/brake · A/D steer · Space handbrake<br>Shift/X gear up · Q/Z gear down · C clutch<br>I ignition (hold to crank) · K choke · L lights · B belt<br>H horn · R radio · N station · V camera · E exit${v.kind === 'tractor' ? '<br>R/F raise/lower bale spear · G drop bale' : ''}`
         : `<b>On foot</b> WASD move · Shift run · Space jump · C crouch<br>LMB pick up · RMB throw · E use/attach · F tools<br>Wheel tighten/loosen bolts · P pee · T watch<br>Tab car checklist · M map · H hide hints · Esc pause`;
       this.hintEl.style.display = 'block';
     } else this.hintEl.style.display = 'none';
@@ -199,8 +199,16 @@ export class UI {
       if (a === 'settings') this.settingsMenu();
       if (a === 'controls') this.controlsMenu();
       if (a === 'stats') this.statsMenu();
-      if (a === 'new') { if (confirm('Delete your save and start over?')) g.newGame(); }
+      if (a === 'new') this.confirmNew();
     });
+  }
+
+  confirmNew() {
+    const g = this.game;
+    const o = this.showOverlay(`<div class="menu"><div class="mt">Start a new summer?</div><div class="mtext">This deletes your current save: the car, money and everything you have done.</div>
+      <button data-a="yes" class="danger">Yes, start over</button><button data-a="no">No, go back</button></div>`, 'dim');
+    o.querySelector('[data-a=yes]').onclick = (ev) => { ev.stopPropagation(); g.newGame(); };
+    o.querySelector('[data-a=no]').onclick = (ev) => { ev.stopPropagation(); audio.play('uiBack'); this.pauseMenu(); };
   }
 
   settingsMenu() {
@@ -217,7 +225,7 @@ export class UI {
       <button data-a="back">Back</button></div>`, 'dim');
     const q = (id) => o.querySelector('#' + id);
     const apply = () => {
-      s.quality = +q('q').value; s.sensitivity = +q('sens').value; s.fov = +q('fov').value; s.volume = +q('vol').value; s.music = +q('mvol').value;
+      if (+q('q').value !== s.quality) s.manualQuality = true; s.quality = +q('q').value; s.sensitivity = +q('sens').value; s.fov = +q('fov').value; s.volume = +q('vol').value; s.music = +q('mvol').value;
       s.invertY = q('inv').checked; s.autoClutch = q('clutch').checked; this.hintsShown = q('hints').checked;
       g.applySettings();
     };

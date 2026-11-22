@@ -67,8 +67,27 @@ export class Van extends Vehicle {
     r.add(mesh(roundBox(1.8, 1.05, 3.2, 0.1), body, 0, 2.05, -0.75));
     r.add(mesh(box(1.82, 0.14, 4.6), stripe, 0, 1.15, 0));
     const gl = glassMat();
+    const darkGl = new THREE.MeshPhysicalMaterial({ color: 0x1a2428, roughness: 0.06, metalness: 0.5 });
     r.add(mesh(box(1.5, 0.6, 0.04), gl, 0, 2.0, 1.58, -0.35));
-    for (const s of [1, -1]) r.add(mesh(box(0.04, 0.5, 0.75), gl, s * 0.89, 2.0, 0.95));
+    for (const s of [1, -1]) {
+      r.add(mesh(box(0.04, 0.5, 0.75), gl, s * 0.89, 2.0, 0.95));
+      // cargo side windows & sliding door seam
+      for (const z of [-0.2, -1.2]) r.add(mesh(box(0.02, 0.45, 0.8), darkGl, s * 0.905, 2.15, z));
+      r.add(mesh(box(0.02, 1.6, 0.02), P.blackMatte, s * 0.905, 1.55, 0.35));
+      r.add(mesh(box(0.02, 0.04, 0.18), P.chrome, s * 0.91, 1.6, 0.25));
+      // wheel arch trims
+      for (const z of [1.5, -1.5]) r.add(mesh(new THREE.TorusGeometry(0.42, 0.04, 6, 16, Math.PI), P.blackMatte, s * 0.905, 0.55, z, 0, Math.PI / 2, 0));
+    }
+    // rear doors with windows, handles and lights
+    r.add(mesh(box(0.02, 1.9, 0.02), P.blackMatte, 0, 1.6, -2.36));
+    for (const x of [0.42, -0.42]) r.add(mesh(box(0.62, 0.45, 0.02), darkGl, x, 2.15, -2.37));
+    r.add(mesh(box(0.16, 0.04, 0.03), P.chrome, 0.12, 1.55, -2.38));
+    // plate
+    const plateTex = canvasTexture(256, 56, (c) => { c.fillStyle = '#f4f4f0'; c.fillRect(0, 0, 256, 56); c.strokeStyle = '#111'; c.lineWidth = 4; c.strokeRect(3, 3, 250, 50); c.fillStyle = '#1a3a8a'; c.fillRect(6, 6, 24, 44); c.fillStyle = '#111'; c.font = 'bold 40px Arial'; c.fillText('KUO-482', 42, 44); });
+    r.add(mesh(new THREE.PlaneGeometry(0.4, 0.09), new THREE.MeshStandardMaterial({ map: plateTex }), 0, 0.82, -2.37, 0, Math.PI, 0));
+    r.add(mesh(new THREE.PlaneGeometry(0.4, 0.09), new THREE.MeshStandardMaterial({ map: plateTex }), 0, 0.7, 2.37));
+    // mirrors
+    for (const s of [1, -1]) { r.add(mesh(box(0.04, 0.04, 0.3), P.black, s * 1.0, 1.95, 1.3, 0, 0, 0)); r.add(mesh(box(0.06, 0.22, 0.14), P.black, s * 1.12, 1.95, 1.3)); }
     r.add(mesh(box(1.9, 0.18, 0.12), P.chrome, 0, 0.62, 2.35));
     r.add(mesh(box(1.9, 0.18, 0.12), P.chrome, 0, 0.62, -2.35));
     r.add(mesh(box(1.2, 0.3, 0.04), P.blackMatte, 0, 0.95, 2.36));

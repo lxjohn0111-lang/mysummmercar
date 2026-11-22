@@ -48,6 +48,9 @@ class AICar {
       const pv = g.player.inVehicle;
       const pp = pv ? pv.pos : g.player.pos;
       if (pp.distanceTo(ahead) < 9) { target = 0; this.honk(); }
+      for (const veh of g.vehicles) if (veh.body && veh !== pv && veh.pos.distanceTo(ahead) < 8) target = 0;
+      // pedestrians get hit if they stand in the way of a fast car
+      if (!pv && !g.player.dead && this.speed > 6 && g.player.pos.distanceTo(this.pos) < 2.4) { g.player.hurt(this.speed * 5, 'got run over by a car'); g.player.vel.set(Math.sin(this.yaw) * 8, 5, Math.cos(this.yaw) * 8); audio.play('crash', this.pos, 0.6); }
       if (g.npcs.moose.pos.distanceTo(ahead) < 10) { target = 0; this.honk(); }
       this.speed = damp(this.speed, target, target < this.speed ? 3 : 0.8, dt);
       this.s += this.speed * this.dir * dt;

@@ -42,12 +42,12 @@ export function buildRoads(game) {
     for (let r = 0; r < rows - 1; r++) {
       for (let c = 0; c < nc - 1; c++) {
         const a = r * nc + c, b = a + 1, cc = a + nc, d = cc + 1;
-        idx.push(a, cc, b, b, cc, d);
+        idx.push(a, b, cc, b, d, cc);
       }
       const ncc = nc - 2;
       for (let c = 0; c < ncc - 1; c++) {
         const a = r * ncc + c, b = a + 1, cc = a + ncc, d = cc + 1;
-        cidx.push(a, cc, b, b, cc, d);
+        cidx.push(a, b, cc, b, d, cc);
       }
     }
     const g = new THREE.BufferGeometry();

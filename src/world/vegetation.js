@@ -458,7 +458,7 @@ float hgt = texture2D(uHeight, suv).r;
 float dens = spl.r * 1.15 + spl.g * 0.25 - spl.b * 0.6 - spl.a;
 float d = length(wxz - uCam.xz);
 float fade = smoothstep(uR, uR * 0.6, d);
-float scaleH = mix(0.35, 0.75, r3);
+float scaleH = mix(0.28, 0.62, r3);
 vec3 tint = mix(vec3(0.95, 1.0, 0.8), vec3(1.1, 1.05, 0.75), r2) ;
 for (int i = 0; i < 4; i++) {
   vec2 q = abs(wxz - uFields[i].xy);
@@ -472,13 +472,13 @@ for (int i = 0; i < 4; i++) {
 float keep = step(r1 * 0.9 + 0.1, dens * uDensity);
 // cut-out around a point (e.g. tent or player built stuff) - unused by default
 float sc = keep * fade * scaleH;
-vec3 transformed = vec3(position.x * (0.55 + r2 * 0.4) * (0.4 + 0.6 * fade), position.y * sc, position.z * (0.55 + r2 * 0.4));
+vec3 transformed = vec3(position.x * (0.42 + r2 * 0.3) * (0.4 + 0.6 * fade), position.y * sc, position.z * (0.42 + r2 * 0.3));
 float ang = r3 * 6.2831;
 transformed.xz = mat2(cos(ang), -sin(ang), sin(ang), cos(ang)) * transformed.xz;
 float bend = position.y * position.y * (sin(uTime * 1.8 + wxz.x * 0.35 + wxz.y * 0.2) * 0.12 + 0.05) * uWind * 2.0;
 transformed.x += bend; transformed.z += bend * 0.6;
 transformed += vec3(wxz.x, hgt - 0.04, wxz.y);
-vGTint = tint * (0.95 + 0.55 * position.y) * 1.15; vGFade = fade;
+vGTint = tint * (1.05 + 0.6 * position.y) * 1.25; vGFade = fade;
 `).replace('#include <beginnormal_vertex>', 'vec3 objectNormal = vec3(0.0, 1.0, 0.0);')
         .replace('#include <project_vertex>', 'vec4 mvPosition = viewMatrix * vec4(transformed, 1.0); gl_Position = projectionMatrix * mvPosition;')
         .replace('#include <worldpos_vertex>', 'vec4 worldPosition = vec4(transformed, 1.0);');

@@ -589,7 +589,7 @@ export class Game {
     if (v) {
       if (!P.dead) v.drive(dt, inp);
       if (inp.hit('KeyE')) this.actions.exitVehicle();
-      if (inp.hit('KeyR')) { const hasRadio = v.isBuildCar ? !!v.slots.radio : v.kind !== 'moped'; if (hasRadio) this.radio.setPlaying(!(this.radio.on && this.radio.source === 'car'), 'car'); else this.ui.toast('No radio in this vehicle.'); }
+      if (inp.hit('KeyR') && v.kind !== 'tractor') { const hasRadio = v.isBuildCar ? !!v.slots.radio : v.kind !== 'moped'; if (hasRadio) this.radio.setPlaying(!(this.radio.on && this.radio.source === 'car'), 'car'); else this.ui.toast('No radio in this vehicle.'); }
       if (inp.hit('KeyN') && this.radio.on) this.radio.nextStation();
       P.updateNeeds(dt, gameDt);
     } else {
@@ -651,6 +651,19 @@ export class Game {
     this.fx.blur = Math.max(this.fx.drunk * 0.5, (this.fx.heat || 0) > 0.6 ? (this.fx.heat - 0.6) * 2 : 0);
     this.fx.fade = Math.max(0, this.fx.fade - dt * 1.2);
     if (n.health < 30) this.fx.hurt = Math.max(this.fx.hurt, 0.25 + 0.1 * Math.sin(now / 300));
+    // adaptive quality: drop a level if the frame rate stays low
+    if (!this.settings.manualQuality) {
+      this.perf = this.perf || { t: 0, frames: 0, cool: 6 };
+      const pf = this.perf; pf.t += dt; pf.frames++; pf.cool -= dt;
+      if (pf.t > 5) {
+        const fps = pf.frames / pf.t;
+        if (pf.cool <= 0 && fps < 26 && this.settings.quality > 0) {
+          this.settings.quality--; this.applySettings(); pf.cool = 8;
+          this.ui.toast(`Graphics lowered to ${QUALITY[this.settings.quality].name} for smoother play (change in Settings).`, 4);
+        }
+        pf.t = 0; pf.frames = 0;
+      }
+    }
     // autosave
     this.saveTimer -= dt;
     if (this.saveTimer <= 0 && !v && !P.dead) this.saveGame();
