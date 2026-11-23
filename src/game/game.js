@@ -27,6 +27,9 @@ import { Traffic } from './traffic.js';
 import { Jobs, Rally } from './jobs.js';
 import { Radio } from './radio.js';
 import { Dialog } from './dialog.js';
+import { Tutorial } from './tutorial.js';
+import { TouchControls } from '../core/touch.js';
+import { IS_MOBILE } from '../core/device.js';
 import { BuildCar } from '../vehicles/buildcar.js';
 import { Van, Tractor, Moped } from '../vehicles/fleet.js';
 import { PARTS, SLOTS } from '../vehicles/parts.js';
@@ -139,12 +142,15 @@ export class Game {
     this.jobs = new Jobs(this);
     this.rally = new Rally(this);
     this.radio = new Radio(this);
+    this.tutorial = new Tutorial(this);
+    if (this.input.mobile) this.touch = new TouchControls(this);
     // inspector / mechanic interaction hitboxes are NPCs; physics callbacks
     this.physics.stepCallbacks.push((dt) => { for (const v of this.vehicles) v.physicsStep(dt); });
     this.setupLights();
     await this.frame();
     this.setLoad(0.82, 'Unpacking the garage…');
     const loaded = this.loadGame(true);
+    if (loaded && !this.state.tut) this.tutorial.fastForward();
     if (!loaded) this.newWorld();
     this.applySettings();
     this.setLoad(0.9, 'Loading textures…');
@@ -344,7 +350,6 @@ export class Game {
     this.garageDoor.toggle();
     this.sky.setWeatherNow({ clouds: 0.3, rain: 0, wind: 0.3, storm: 0 });
     this.state.mail = [{ kind: 'gift', title: 'Letter from your uncle', text: 'Hi kid! The Ruska is in the garage. All the parts are there, mostly. Spark plugs are shot and you\'ll need a fan belt and an oil filter from Rautala. Battery needs charging. Keys are in the ignition. Don\'t burn the house down. — Uncle Veikko<br><br>P.S. here is some money for parts.', amount: 300 }];
-    this.ui.objective('Your uncle left a letter in the mailbox by the road. Then start building the Ruska in the garage (Tab = checklist).');
   }
 
   layoutGarageParts(insts) {
@@ -395,7 +400,7 @@ export class Game {
   // ---------------------------------------------------------------- settings
   loadSettings() {
     try { const s = JSON.parse(SDK.getItem('settings') || 'null'); if (s) Object.assign(this.settings, s); } catch (e) {}
-    if (this.settings.quality === undefined) this.settings.quality = 2;
+    if (this.settings.quality === undefined) this.settings.quality = IS_MOBILE ? 0 : 2;
   }
   applySettings() {
     const s = this.settings;
@@ -568,6 +573,7 @@ export class Game {
     this.last = now;
     if (!this.started) return;
     const inp = this.input;
+    this.touch?.update();
     if (this.paused || this.modalOpen) {
       // still render (frozen) so menus show the world behind
       this.renderFrame(0.0001);
@@ -576,7 +582,7 @@ export class Game {
     }
     const g = this, P = this.player;
     // ---- global keys
-    if (inp.hit('Tab')) { this.sheetOpen = this.ui.toggleSheet(this.sheetOpen ? null : this.checklistHTML()); }
+    if (inp.hit('Tab')) { this.sheetOpen = this.ui.toggleSheet(this.sheetOpen ? null : this.checklistHTML()); if (this.sheetOpen) this.tutSheetSeen = true; }
     if (this.sheetOpen && Math.random() < 0.05) this.ui.sheetEl.innerHTML = this.checklistHTML();
     if (inp.hit('KeyM')) this.ui.toggleMap();
     if (inp.hit('KeyH') && !P.inVehicle) this.ui.hintsShown = !this.ui.hintsShown;
@@ -676,6 +682,7 @@ export class Game {
     // autosave
     this.saveTimer -= dt;
     if (this.saveTimer <= 0 && !v && !P.dead) this.saveGame();
+    this.tutorial.update(dt);
     this.ui.update(dt);
     this.renderFrame(dt);
     inp.endFrame();

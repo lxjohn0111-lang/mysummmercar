@@ -32,6 +32,7 @@ export class Actions {
     const g = this.g, n = g.player.n;
     for (const k of ['hunger', 'thirst', 'fatigue', 'stress', 'bladder']) if (eff[k]) n[k] = clamp(n[k] + eff[k], 0, 100);
     if (eff.drunk) n.drunk = Math.max(0, n.drunk + eff.drunk);
+    if (eff.hunger && eff.hunger < 0) g.stats.meals = (g.stats.meals || 0) + 1;
     if (eff.sound) audio.play(eff.sound, g.camera.position);
     if (eff.msg) g.ui.toast(eff.msg);
     if (eff.burp && Math.random() < 0.5) setTimeout(() => audio.play('burp', g.camera.position), 1400);
@@ -117,8 +118,11 @@ export class Actions {
     audio.play('hiss', g.camera.position);
     g.ui.toast('Cooking... sizzle sizzle.');
     g.advanceTime(10);
-    const ne = this.spawnNear(to, g.spots.fridgeDrop.clone().setY(g.spots.fridgeDrop.y - 0.7));
+    // the cooked food lands back in your hand
+    const hand = g.camera.position.clone().add(new THREE.Vector3(0, 0, -0.75).applyQuaternion(g.camera.quaternion));
+    const ne = g.items.spawn(to, hand);
     g.interact.pickUp(ne);
+    g.ui.toast('Cooked! Press E to eat it.');
   }
 
   // ---------------------------------------------------------------- sleep / pass out
@@ -545,9 +549,10 @@ export class Actions {
   }
   readMail(e) {
     const g = this.g, m = e.data;
+    (g.state.tutFlags ||= {}).letter = true;
     const opts = [];
     if (m.kind === 'bill' && !m.paid) opts.push({ label: `Pay now (${fmtMoney(m.amount)})`, disabled: g.state.money < m.amount, action: () => { g.spend(m.amount); m.paid = true; g.state.bills = Math.max(0, (g.state.bills || 0) - 1); g.items.remove(e); g.ui.toast('Bill paid.'); } });
-    if (m.kind === 'gift' && !m.taken) opts.push({ label: `Take the money (${fmtMoney(m.amount)})`, action: () => { m.taken = true; g.earn(m.amount, 'Letter from Mum'); g.items.remove(e); } });
+    if (m.kind === 'gift' && !m.taken) opts.push({ label: `Take the money (${fmtMoney(m.amount)})`, action: () => { m.taken = true; g.earn(m.amount, m.title); g.items.remove(e); } });
     g.ui.menu({ title: m.title, text: m.text, options: opts.length ? opts : [{ label: 'OK' }] });
     return true;
   }

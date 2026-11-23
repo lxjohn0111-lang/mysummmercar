@@ -1,10 +1,22 @@
 import { fmtMoney, fmtTime, DAYS, clamp } from '../core/util.js';
 import { audio } from '../core/audio.js';
 import { MAP_SIZE, HALF, P } from '../world/layout.js';
+import { IS_MOBILE } from '../core/device.js';
 
 const h = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
 const NEED_ICONS = { hunger: '🍖', thirst: '💧', fatigue: '😴', stress: '💢', bladder: '🚽', dirt: '🧼', drunk: '🍺', health: '❤️' };
 const NEED_NAMES = { hunger: 'Hunger', thirst: 'Thirst', fatigue: 'Fatigue', stress: 'Stress', bladder: 'Bladder', dirt: 'Dirtiness', drunk: 'Drunk', health: 'Health' };
+
+// {E}-style tokens in guide texts -> key chips (desktop) or on-screen button names (phones)
+const KEYS_DESK = { E: 'E', F: 'F', LMB: 'Left click', RMB: 'Right click', WHEEL: 'Mouse wheel', TAB: 'Tab', M: 'M', I: 'hold I', W: 'W', S: 'S', AD: 'A / D', P: 'P', R: 'R', G: 'G', SPACE: 'Space' };
+const KEYS_TOUCH = { E: 'USE', F: '🔧', LMB: 'GRAB', RMB: 'THROW', WHEEL: 'TIGHTEN', TAB: 'CAR LIST', M: 'MAP', I: 'START', W: 'GAS', S: 'BRAKE', AD: 'left stick', P: '🚽', R: 'FORK ▲', G: 'DROP', SPACE: 'JUMP' };
+export function keyText(text) {
+  const map = IS_MOBILE ? KEYS_TOUCH : KEYS_DESK;
+  return String(text || '').replace(/\{(\w+)\}/g, (m, k) => `<span class="key">${map[k] || k}</span>`);
+}
+// interaction prompt keys on phones
+const PROMPT_TOUCH = { E: 'USE', LMB: 'GRAB', RMB: 'THROW', F: '🔧', 'Wheel↑/LMB': 'TIGHTEN', 'Wheel↓/RMB': 'LOOSEN', Wheel: 'TUNE ±', 3: '🔧' };
+const promptKey = (k) => (IS_MOBILE ? PROMPT_TOUCH[k] ?? null : k);
 
 export class UI {
   constructor(game) {
@@ -27,7 +39,10 @@ export class UI {
     // info top-right
     this.info = h('div', 'info'); this.hud.appendChild(this.info);
     this.toasts = h('div', 'toasts'); this.hud.appendChild(this.toasts);
-    this.objEl = h('div', 'objective'); this.hud.appendChild(this.objEl);
+    this.guideEl = h('div', 'guide'); this.hud.appendChild(this.guideEl);
+    this.edgeEl = h('div', 'gedge'); this.hud.appendChild(this.edgeEl);
+    this.celebEl = h('div', 'celebrate'); root.appendChild(this.celebEl);
+    this.jobText = null; this.jobSub = '';
     this.subEl = h('div', 'subtitle'); this.hud.appendChild(this.subEl);
     this.vehEl = h('div', 'vehicle'); this.hud.appendChild(this.vehEl);
     this.toolEl = h('div', 'tool'); this.hud.appendChild(this.toolEl);
@@ -42,6 +57,7 @@ export class UI {
     this.dialogEl = h('div', 'dialog hidden'); root.appendChild(this.dialogEl);
     this.sheetEl = h('div', 'sheet hidden'); root.appendChild(this.sheetEl);
     this.mapEl = h('div', 'mapview hidden'); root.appendChild(this.mapEl);
+    if (IS_MOBILE) this.mapEl.addEventListener('pointerdown', (e) => { e.preventDefault(); this.toggleMap(); });
     this.setTool('hands');
     this.subT = 0;
     this.lastInfo = '';
@@ -62,14 +78,66 @@ export class UI {
     this.subEl.classList.add('show');
     this.subT = dur;
   }
-  objective(text) {
-    if (!text) { this.objEl.classList.remove('show'); return; }
-    this.objEl.innerHTML = `<div class="ot">OBJECTIVE</div>${text}`;
-    this.objEl.classList.add('show');
+  // short job / police / race goal; drawn by the guide card (see tutorial.js)
+  objective(title, sub = '') { this.jobText = title || null; this.jobSub = title ? sub : ''; }
+
+  // the one goal card at the top of the screen
+  setGuide(gd) {
+    const el = this.guideEl;
+    this.guide = gd;
+    if (!gd) { el.classList.remove('show'); this.edgeEl.style.display = 'none'; this.lastGuide = ''; return; }
+    const dist = gd.dist != null ? (gd.dist > 1000 ? `${(gd.dist / 1000).toFixed(1)} km` : `${Math.round(gd.dist)} m`) : '';
+    const head = gd.step ? `<span class="gs">STEP ${gd.step}/${gd.total}</span>` : gd.interrupt ? '<span class="gs need">NEED</span>' : gd.job ? '<span class="gs job">JOB</span>' : '';
+    const nav = gd.angle != null ? `<div class="gnav"><div class="garrow" style="transform:rotate(${(gd.angle * 180 / Math.PI).toFixed(0)}deg)">▲</div><div class="gdist">${dist}</div></div>` : gd.arrived && gd.text ? '<div class="gnav here"><div class="gok">✓</div><div class="gdist">HERE</div></div>' : '';
+    const prog = gd.progress != null ? `<div class="gprog"><div style="width:${Math.round(gd.progress * 100)}%"></div></div>` : '';
+    const key = `${gd.title}|${gd.text}|${dist}|${gd.angle != null ? Math.round(gd.angle * 20) : 'x'}|${gd.arrived}|${prog}`;
+    if (key !== this.lastGuide) {
+      this.lastGuide = key;
+      el.innerHTML = `${nav}<div class="gbody"><div class="gt">${head}${gd.title}</div>${gd.text ? `<div class="gx">${keyText(gd.text)}</div>` : ''}${prog}</div>`;
+    }
+    el.classList.add('show');
+    const arrivedNow = !!(gd.arrived && gd.text);
+    if (arrivedNow !== this.guideArrived) {
+      this.guideArrived = arrivedNow;
+      el.classList.toggle('arrived', arrivedNow);
+      if (arrivedNow) { el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); }
+    }
+    // screen-edge pointer to the target
+    const g = this.game;
+    if (!gd.target || g.uiBlocking) { this.edgeEl.style.display = 'none'; return; }
+    const p = gd.target.clone(); p.y += 1.5;
+    p.project(g.camera);
+    const W = window.innerWidth, H = window.innerHeight;
+    let x = (p.x * 0.5 + 0.5) * W, y = (-p.y * 0.5 + 0.5) * H;
+    const behind = p.z > 1;
+    const m = 46;
+    const onScreen = !behind && x > m && x < W - m && y > m + 60 && y < H - m;
+    if (onScreen) {
+      this.edgeEl.className = 'gedge on';
+      this.edgeEl.style.transform = `translate(${x}px, ${y}px)`;
+      this.edgeEl.innerHTML = `<div class="ea">▼</div><div class="ed">${dist}</div>`;
+    } else {
+      // direction from the screen centre (flip when behind the camera)
+      let dx = x - W / 2, dy = y - H / 2;
+      if (behind) { dx = -dx; dy = -dy; if (Math.abs(dy) < 1) dy = 1; dy = Math.abs(dy); }
+      const k = Math.min((W / 2 - m) / Math.max(1e-3, Math.abs(dx)), (H / 2 - m) / Math.max(1e-3, Math.abs(dy)));
+      x = W / 2 + dx * k; y = H / 2 + dy * k;
+      const ang = Math.atan2(dy, dx) * 180 / Math.PI + 90;
+      this.edgeEl.className = 'gedge off';
+      this.edgeEl.style.transform = `translate(${x}px, ${y}px)`;
+      this.edgeEl.innerHTML = `<div class="ea" style="transform:rotate(${ang.toFixed(0)}deg)">▲</div><div class="ed">${dist}</div>`;
+    }
+    this.edgeEl.style.display = 'block';
+  }
+  celebrate(title, sub) {
+    const e = this.celebEl;
+    e.innerHTML = `<div class="ct">✔ ${title}</div><div class="cs">${keyText(sub)}</div>`;
+    e.classList.remove('show'); void e.offsetWidth; e.classList.add('show');
+    clearTimeout(this.celebT); this.celebT = setTimeout(() => e.classList.remove('show'), 2600);
   }
   setTool(t) {
     const names = { hands: '✋ Hands', wrench: '🔧 Wrench', screwdriver: '🪛 Screwdriver' };
-    this.toolEl.innerHTML = `${names[t]}<span>F / 1-3</span>`;
+    this.toolEl.innerHTML = `${names[t]}<span>${IS_MOBILE ? '' : 'F / 1-3'}</span>`;
     this.toolEl.className = 'tool ' + t;
   }
   achievement(title, desc) {
@@ -87,7 +155,7 @@ export class UI {
     // prompt
     const pr = g.interact.prompt;
     if (pr.main && !g.uiBlocking) {
-      let keys = pr.keys.map(([k, l]) => (k ? `<span class="key">${k}</span>${l}` : `<span class="note">${l}</span>`)).join('');
+      let keys = pr.keys.map(([k, l]) => { if (!k) return `<span class="note">${l}</span>`; const kk = promptKey(k); return kk === null ? '' : `<span class="key">${kk}</span>${l}`; }).join('');
       this.promptEl.innerHTML = `<div class="pm">${pr.main}</div>${pr.sub ? `<div class="ps">${pr.sub}</div>` : ''}<div class="pk">${keys}</div>`;
       this.promptEl.style.display = 'block';
     } else this.promptEl.style.display = 'none';
@@ -136,7 +204,7 @@ export class UI {
     } else this.vehEl.style.display = 'none';
     this.toolEl.style.display = v ? 'none' : 'block';
     // hints
-    if (this.hintsShown) {
+    if (this.hintsShown && !IS_MOBILE) {
       this.hintEl.innerHTML = v ? `<b>Driving</b> W/S gas/brake · A/D steer · Space handbrake<br>Shift/X gear up · Q/Z gear down · C clutch<br>I ignition (hold to crank) · K choke · L lights · B belt<br>H horn · R radio · N station · V camera · E exit${v.kind === 'tractor' ? '<br>R/F raise/lower bale spear · G drop bale' : ''}`
         : `<b>On foot</b> WASD move · Shift run · Space jump · C crouch<br>LMB pick up · RMB throw · E use/attach · F tools<br>Wheel tighten/loosen bolts · P pee · T watch<br>Tab car checklist · M map · H hide hints · Esc pause`;
       this.hintEl.style.display = 'block';
@@ -153,6 +221,7 @@ export class UI {
     for (let i = 0; i < this.markerEls.length; i++) {
       const e = this.markerEls[i], m = markers[i];
       if (!m) { e.style.display = 'none'; continue; }
+      if (this.guide?.target && this.guide.target.distanceToSquared(m.pos) < 4) { e.style.display = 'none'; continue; }
       const p = m.pos.clone(); p.y += 2;
       const d = p.distanceTo(cam.position);
       p.project(cam);
@@ -168,6 +237,7 @@ export class UI {
   showOverlay(html, cls = '') {
     this.overlay.className = 'overlay ' + cls;
     this.overlay.innerHTML = html;
+    this.overlay.onclick = null; // a new screen must not inherit the last one's click handler
     return this.overlay;
   }
   hideOverlay() { this.overlay.className = 'overlay hidden'; this.overlay.innerHTML = ''; }
@@ -176,7 +246,7 @@ export class UI {
     const o = this.showOverlay(`<div class="ctp">
       ${first ? `<div class="logo">KESÄKAARA</div><div class="tag">Summer 1997 · Kurkijärvi, Finland</div>
       <div class="story">Your uncle left for a job on the oil rigs and left you his house by the lake, a tired old van, a moped — and a <b>Ruska 1300</b> in a hundred pieces in the garage. Build it. Register it. Win the Saturday rally. Try not to die.</div>` : '<div class="logo small">PAUSED</div>'}
-      <div class="go">${first ? 'Click to start your summer' : 'Click to continue'}</div></div>`, 'ctp-wrap');
+      <div class="go">${first ? (IS_MOBILE ? 'Tap to start your summer' : 'Click to start your summer') : (IS_MOBILE ? 'Tap to continue' : 'Click to continue')}</div>${IS_MOBILE ? '<div class="rot">📱↻ Turn your phone sideways for the best view</div>' : ''}</div>`, 'ctp-wrap');
     o.onclick = () => { this.game.resume(); };
   }
 
@@ -189,6 +259,7 @@ export class UI {
       <button data-a="settings">Settings</button>
       <button data-a="controls">Controls</button>
       <button data-a="stats">Statistics & achievements</button>
+      <button data-a="tut">${g.tutorial?.active ? 'Skip the tutorial' : 'Show the tutorial again'}</button>
       <button data-a="new" class="danger">Start a new summer</button>
       <div class="ver">Save: autosaves every few minutes and when you sleep.</div></div>`, 'dim');
     o.querySelectorAll('button').forEach((b) => b.onclick = (ev) => {
@@ -199,6 +270,7 @@ export class UI {
       if (a === 'settings') this.settingsMenu();
       if (a === 'controls') this.controlsMenu();
       if (a === 'stats') this.statsMenu();
+      if (a === 'tut') { if (g.tutorial.active) g.tutorial.skip(); else { g.tutorial.restart(); this.toast('Tutorial is back. Follow the yellow arrows!'); } this.pauseMenu(); }
       if (a === 'new') this.confirmNew();
     });
   }
@@ -233,6 +305,14 @@ export class UI {
     o.querySelector('[data-a=back]').onclick = (ev) => { ev.stopPropagation(); audio.play('uiBack'); this.pauseMenu(); };
   }
   controlsMenu() {
+    if (IS_MOBILE) {
+      const o = this.showOverlay(`<div class="menu wide"><div class="mt">Touch controls</div><div class="controls">
+        <div><b>On foot</b><br>Drag the left side — walk (push far to run) · Drag the right side — look<br>USE — open, talk, attach, eat/drink · GRAB — pick up / drop · THROW<br>✋ — switch hands / wrench / screwdriver<br>TIGHTEN / LOOSEN — bolts (with the wrench), tuning (with the screwdriver)<br>CAR LIST — what the car still needs · MAP · 🚽 — pee</div>
+        <div><b>Driving</b><br>Left stick — steer · GAS / BRAKE pedals<br>START (hold) — crank the engine · ▲ ▼ — gears · HAND BRAKE<br>EXIT — get out · 💡 lights · 🎥 camera · 📯 horn · 📻 radio · BELT<br>Tractor: FORK ▲ / ▼ — lift and lower bales</div></div>
+        <button data-a="back">Back</button></div>`, 'dim');
+      o.querySelector('[data-a=back]').onclick = (ev) => { ev.stopPropagation(); audio.play('uiBack'); this.pauseMenu(); };
+      return;
+    }
     const o = this.showOverlay(`<div class="menu wide"><div class="mt">Controls</div><div class="controls">
       <div><b>On foot</b><br>WASD — move · Shift — run · Space — jump · C — crouch<br>Mouse — look · LMB — pick up / drop · RMB — throw<br>E — use, talk, attach a held part, drink/eat held item<br>F or 1/2/3 — hands / wrench / screwdriver<br>Mouse wheel (wrench) — tighten / loosen bolts<br>Mouse wheel (screwdriver) — tune carburettor & ignition<br>R (holding) — rotate item · P — pee · T — check watch<br>Tab — car build checklist · M — map · H — toggle hints</div>
       <div><b>Driving</b><br>W / S — throttle / brake · A / D — steer<br>Space — handbrake · Shift or X — gear up · Q or Z — gear down<br>C — clutch · I — ignition (hold to crank the starter)<br>K — choke (cold starts) · L — lights · B — seatbelt · H — horn<br>R — radio on/off · N — next station · V — camera · E — exit<br>Tractor: R / F — raise / lower bale spear</div></div>
@@ -319,7 +399,8 @@ export class UI {
   // conversation box (keyboard driven, no pointer unlock)
   dialog(name, text, options) {
     this.dialogEl.className = 'dialog';
-    this.dialogEl.innerHTML = `<div class="dn">${name}</div><div class="dt">${text}</div><div class="do">${options.map((o, i) => `<div class="dopt"><span class="key">${i + 1}</span>${o.label}</div>`).join('')}</div>`;
+    this.dialogEl.innerHTML = `<div class="dn">${name}</div><div class="dt">${text}</div><div class="do">${options.map((o, i) => `<div class="dopt" data-i="${i}"><span class="key">${IS_MOBILE ? '›' : i + 1}</span>${o.label}</div>`).join('')}</div>`;
+    this.dialogEl.querySelectorAll('.dopt').forEach((b) => b.addEventListener('pointerdown', (ev) => { ev.preventDefault(); ev.stopPropagation(); this.game.dialog.choose(+b.dataset.i); }));
   }
   closeDialog() { this.dialogEl.className = 'dialog hidden'; }
 

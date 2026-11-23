@@ -22,7 +22,7 @@ export class Vehicle {
     this.health = 100; this.engineTemp = 20;
     this.speed = 0; this.speedKmh = 0;
     this.driver = null;
-    this.camMode = 0; // 0 first person, 1 chase
+    this.camMode = game.input?.mobile ? 1 : 0; // 0 first person, 1 chase (phones start in chase view)
     this.lookYaw = 0; this.lookPitch = -0.08;
     this.prevVel = new THREE.Vector3();
     this.lastImpact = 0;
@@ -279,7 +279,8 @@ export class Vehicle {
   drive(dt, input) {
     const st = this.engineStats();
     const inp = input;
-    const steerIn = inp.axis('KeyD', 'KeyA'); // + = left
+    let steerIn = inp.axis('KeyD', 'KeyA'); // + = left
+    if (inp.analog && inp.analog.active) steerIn = -Math.sign(inp.analog.x) * Math.min(1, Math.abs(inp.analog.x) * 1.15);
     const speedF = clamp(this.speedKmh / 110, 0, 1);
     const maxSteer = (this.cfg.maxSteer ?? 0.6) * (1 - speedF * 0.55);
     let targetSteer = steerIn * maxSteer;
@@ -288,7 +289,8 @@ export class Vehicle {
     const drunk = this.game.player.n.drunk;
     if (drunk > 0.4) targetSteer += Math.sin(performance.now() / 900) * drunk * 0.04;
     this.steer = damp(this.steer, targetSteer, steerIn === 0 ? 7 : 5 * (this.cfg.steerSpeed ?? 1), dt);
-    const w = inp.down('KeyW') ? 1 : 0, s = inp.down('KeyS') ? 1 : 0;
+    let w = inp.down('KeyW') ? 1 : 0, s = inp.down('KeyS') ? 1 : 0;
+    if (inp.analog && inp.analog.active) { if (inp.analog.y < -0.35) w = Math.max(w, Math.min(1, -inp.analog.y * 1.2)); if (inp.analog.y > 0.5) s = Math.max(s, 1); }
     // smart: S reverses when stopped in reverse gear
     this.throttle = damp(this.throttle, w, 10, dt);
     this.brake = s;

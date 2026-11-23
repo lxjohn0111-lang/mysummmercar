@@ -240,8 +240,8 @@ export class SkySystem {
 
     // environment map refresh
     this.envTimer -= dt;
-    if (this.envTimer <= 0 || this.sunDir.distanceTo(this.lastEnvSun) > 0.08) {
-      this.envTimer = 8;
+    if (this.envTimer <= 0 || this.sunDir.distanceTo(this.lastEnvSun) > (this.game.input?.mobile ? 0.2 : 0.08)) {
+      this.envTimer = this.game.input?.mobile ? 30 : 8;
       this.lastEnvSun.copy(this.sunDir);
       this.updateEnv();
     }

@@ -7,7 +7,7 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { AfterimagePass } from 'three/examples/jsm/postprocessing/AfterimagePass.js';
 
 export const QUALITY = [
-  { name: 'Low', pixelRatio: 0.7, shadows: false, shadowSize: 1024, bloom: false, msaa: 0, veg: 0 },
+  { name: 'Low', pixelRatio: 0.75, shadows: false, shadowSize: 1024, bloom: false, msaa: 0, veg: 0, direct: true },
   { name: 'Medium', pixelRatio: 0.9, shadows: true, shadowSize: 1024, bloom: false, msaa: 0, veg: 1 },
   { name: 'High', pixelRatio: 1.0, shadows: true, shadowSize: 2048, bloom: true, msaa: 4, veg: 2 },
   { name: 'Ultra', pixelRatio: 1.5, shadows: true, shadowSize: 4096, bloom: true, msaa: 4, veg: 3 },
@@ -92,6 +92,7 @@ export class Post {
     this.composer.addPass(new OutputPass());
     this.final = new ShaderPass(FinalShader);
     this.composer.addPass(this.final);
+    this.direct = !!q.direct;
     this.resize();
   }
   resize() {
@@ -111,6 +112,8 @@ export class Post {
     const trail = Math.min(0.88, fx.drunk * 0.5);
     this.after.enabled = trail > 0.05;
     this.after.uniforms.damp.value = trail;
+    // Low quality: skip the post chain entirely while no screen effect is running
+    if (this.direct && fx.drunk < 0.01 && fx.fade < 0.01 && fx.hurt < 0.01 && !fx.water && fx.blur < 0.01 && fx.sleepy < 0.01) { this.renderer.setRenderTarget(null); this.renderer.render(this.scene, this.camera); return; }
     this.composer.render(dt);
   }
 }

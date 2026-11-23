@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { buildTrafficCar } from '../vehicles/fleet.js';
 import { clamp, damp, rand, pick } from '../core/util.js';
 import { audio } from '../core/audio.js';
+import { IS_MOBILE } from '../core/device.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
 
@@ -86,7 +87,7 @@ export class Traffic {
     this.game = game;
     this.road = game.terrain.roads.find((r) => r.id === 'highway');
     this.cars = [];
-    const kinds = ['sedan', 'wagon', 'sedan', 'wagon', 'sedan', 'sedan'];
+    const kinds = IS_MOBILE ? ['sedan', 'wagon', 'sedan'] : ['sedan', 'wagon', 'sedan', 'wagon', 'sedan', 'sedan'];
     const cols = [0x7a2a2a, 0x2a4a6a, 0xd8d0b0, 0x3a5a3a, 0x8a8a8a, 0x6a4a2a];
     for (let i = 0; i < kinds.length; i++) this.cars.push(new AICar(game, this.road, kinds[i], cols[i], (i / kinds.length) * this.road.length, i % 2 ? 1 : -1));
     // police
@@ -178,7 +179,7 @@ export class Traffic {
     const g = this.game, P = this.pol;
     P.state = 'pursuit'; P.reasons = reasons; P.stopTimer = 0; P.lostTimer = 0; P.chaseT = 0;
     g.ui.toast('🚨 POLICE! Pull over and stop the vehicle.', 5);
-    g.ui.objective('Police pursuit: stop the car near the police, or lose them');
+    g.ui.objective('Police! 🚨', 'Stop next to the police car, or try to lose them.');
     g.stats.chases = (g.stats.chases || 0) + 1;
   }
   losePursuit() {

@@ -13,6 +13,7 @@ export class Dialog {
   open(n) {
     const g = this.game;
     this.npc = n;
+    (g.state.tutFlags ||= {})['talk_' + n.id] = true;
     const opts = [];
     const chat = { label: 'Chat', fn: () => n.say(pick(LINES[n.id] || ['...'])) };
     const bye = { label: 'Bye', fn: () => {} };
@@ -85,10 +86,13 @@ export class Dialog {
     if (!n) return;
     if (n.pos.distanceTo(g.player.pos) > 4.5 || g.player.inVehicle) { this.close(); return; }
     for (let i = 0; i < this.options.length; i++) {
-      if (g.input.hit(`Digit${i + 1}`) || g.input.hit(`Numpad${i + 1}`)) {
-        const op = this.options[i]; this.close(); audio.play('ui'); op.fn(); return;
-      }
+      if (g.input.hit(`Digit${i + 1}`) || g.input.hit(`Numpad${i + 1}`)) { this.choose(i); return; }
     }
+  }
+  choose(i) {
+    const op = this.options[i];
+    if (!op || !this.npc) return;
+    this.close(); audio.play('ui'); op.fn();
   }
   close() { this.npc = null; this.game.ui.closeDialog(); }
   get open_() { return !!this.npc; }

@@ -15,11 +15,12 @@ export class Jobs {
     const j = this.active;
     if (j) {
       if (j.type === 'hay') {
+        // most urgent first: get the tractor, then a bale, then the barn
         const left = j.bales.filter((b) => !b.done);
-        if (left.length) out.push({ pos: this.game.spots.barnDrop, label: `Barn (${j.delivered}/${j.bales.length})`, icon: '🏠' });
         const tr = this.game.tractor;
-        if (!this.game.player.inVehicle || this.game.player.inVehicle !== tr) out.push({ pos: tr.pos.clone(), label: 'Tractor', icon: '🚜' });
+        if (this.game.player.inVehicle !== tr) out.push({ pos: tr.pos.clone(), label: 'Tractor', icon: '🚜' });
         if (tr.bale === null) { const nb = left.find(() => true); if (nb) out.push({ pos: nb.ent.mesh.position.clone(), label: 'Hay bale', icon: '⬤' }); }
+        if (left.length) out.push({ pos: this.game.spots.barnDrop, label: `Barn (${j.delivered}/${j.bales.length})`, icon: '🏠' });
       }
       if (j.type === 'paper') { const n = j.stops.find((s) => !s.done); if (n) out.push({ pos: n.pos, label: `Mailbox ${j.stops.filter((s) => s.done).length + 1}/${j.stops.length}`, icon: '📰' }); }
       if (j.type === 'delivery') out.push({ pos: j.dest, label: j.destName, icon: '📦' });
@@ -44,7 +45,7 @@ export class Jobs {
       bales.push({ ent, done: false });
     }
     this.active = { type: 'hay', bales, delivered: 0, pay: 70 };
-    g.ui.objective('Hay job: bring the 8 bales to Aune\'s barn with the tractor. Spear a bale with the front fork (R/F raise/lower).');
+    g.ui.objective('Hay job: bales to the barn', 'Take the tractor. Drive the fork into a bale, lift it with {R}, bring it to the barn and lower it with {F}.');
   }
   updateHay(dt) {
     const g = this.game, j = this.active, tr = g.tractor;
@@ -93,7 +94,7 @@ export class Jobs {
       stops.push({ pos, done: false, mb });
     }
     this.active = { type: 'paper', stops, start: g.time.minutes, pay: 22 };
-    g.ui.objective('Newspaper round: drive past each mailbox and press E (or throw a paper into it). Faster = bonus. The moped is handy!');
+    g.ui.objective('Newspaper round', 'Stop at each mailbox and press {E}. Faster = bonus.');
   }
   updatePaper(dt) {
     const g = this.game, j = this.active;
@@ -140,7 +141,7 @@ export class Jobs {
       crates.push(g.items.spawn('deliveryBox', p, { data: { dest: d.name } }));
     }
     this.active = { type: 'delivery', dest: d.pos.clone(), destName: d.name, crates, pay: 85 };
-    g.ui.objective(`Delivery: 4 crates are in the Kuormuri van. Bring them to ${d.name} and carry them to the marker.`);
+    g.ui.objective(`Delivery to ${d.name}`, 'The 4 crates are in your van. Drive there, then carry them to the marker.');
   }
   updateDelivery(dt) {
     const g = this.game, j = this.active;
@@ -160,7 +161,7 @@ export class Jobs {
     const g = this.game;
     this.active = { type: 'taxi', vehicle, dest: dest.clone(), destName, pay: Math.round(rand(40, 90)), t: 0, comment: 8 };
     g.npcs.givePerttiRide(vehicle);
-    g.ui.objective(`Drive Pertti to ${destName}. Try not to let him throw up in the car.`);
+    g.ui.objective(`Taxi: Pertti to ${destName}`, 'Drive gently or he will throw up.');
   }
   updateTaxi(dt) {
     const g = this.game, j = this.active, v = j.vehicle;
@@ -253,7 +254,7 @@ export class Rally {
     this.competitive = competitive;
     this.state = 'toStart';
     this.active = true;
-    g.ui.objective(`Drive to the start line under the arch and stop. ${competitive ? 'Race' : 'Practice'} run.`);
+    g.ui.objective(competitive ? 'Rally race' : 'Rally practice', 'Drive under the start arch and stop.');
   }
   update(dt) {
     if (!this.active) return;

@@ -91,6 +91,8 @@ function buildHome(game) {
   // bedroom
   B.add(PR.bed(), -3.9, fy, -2.3, 0); B.col(1.0, 0.7, 2.0, -3.9, fy + 0.35, -2.3);
   game.spots.bed = B.w(-3.9, fy + 0.7, -2.3);
+  game.spots.stove = B.w(4.2, fy + 0.95, -D / 2 + 0.42);
+  game.spots.tap = B.w(2.0, fy + 1.0, -D / 2 + 0.42);
   B.add(PR.shelf(1.0, 1.9, 0.5, 4, M.darkWood), -1.3, fy, -D / 2 + 0.3, 0); B.col(1.0, 1.9, 0.5, -1.3, fy + 0.95, -D / 2 + 0.3);
   B.add(PR.rug(1.6, 1.0, 0x2a4a6a), -2.6, fy + 0.005, -1.0);
   B.add(PR.lamp(1.2), -3.0, fy, -3.0);
@@ -99,7 +101,7 @@ function buildHome(game) {
   B.add(PR.counter(0.7, true), -4.4, fy, 1.95, 0);
   // interactions
   B.hit(1.1, 0.8, 2.1, -3.9, fy + 0.4, -2.3, { label: 'Sleep', use: () => game.actions.sleep() });
-  B.hit(0.62, 0.3, 0.62, 4.2, fy + 0.95, -D / 2 + 0.42, { label: 'Stove: cook', use: () => game.actions.cook() });
+  B.hit(0.62, 0.3, 0.62, 4.2, fy + 0.95, -D / 2 + 0.42, { label: () => (game.interact.held?.def.cookTo ? `Cook the ${game.interact.held.def.name.replace(' (raw)', '').toLowerCase()}` : 'Stove: hold food here to cook it'), use: () => game.actions.cook(), held: (e) => !!e.def.cookTo });
   B.hit(0.6, 0.3, 0.5, 2.0, fy + 1.0, -D / 2 + 0.42, { label: 'Drink tap water', use: () => game.actions.drinkTap() });
   B.hit(0.45, 0.5, 0.5, -4.5, fy + 0.35, 2.8, { label: 'Use toilet', use: () => game.actions.toilet() });
   B.hit(0.3, 0.25, 0.3, W / 2 - 0.25, fy + 1.05, 2.6, { label: 'Telephone', use: () => game.actions.phone() });
@@ -235,7 +237,7 @@ function buildSauna(game) {
   game.spots.saunaBench = B.w(1.0, F + 1.0, 1.3);
   game.spots.saunaSeatLook = B.w(0.1, F + 0.9, -1.25);
   game.spots.saunaRoom = { center: B.w(0.95, F + 1.2, 0), half: V(1.35, 1.2, D / 2), ry };
-  B.hit(0.6, 0.9, 0.6, 0.1, F + 0.45, -1.25, { label: () => game.actions.stoveLabel(), use: () => game.actions.saunaStove(), alt: () => game.actions.throwWater() });
+  B.hit(0.6, 0.9, 0.6, 0.1, F + 0.45, -1.25, { label: () => game.actions.stoveLabel(), use: () => game.actions.saunaStove(), held: (e) => e.defId === 'firewood' || e.defId === 'sausage', alt: () => game.actions.throwWater() });
   B.hit(2.6, 0.5, 0.9, 1.0, F + 1.0, 1.25, { label: () => (game.player.sitting ? 'Stand up' : 'Sit on the bench'), use: () => game.actions.saunaSit() });
   B.hit(0.35, 0.3, 0.35, 1.0, F + 0.15, -1.3, { label: 'Throw löyly (water on stones)', use: () => game.actions.throwWater() });
   // dressing room bench + towels
@@ -281,7 +283,7 @@ function buildShed(game) {
   game.spots.logPile = B.w(-1.6, 0.4, 3.2);
   game.spots.firewoodPile = B.w(0, 1.0, -0.3);
   B.hit(4.0, 1.6, 0.8, 0, 0.8, -0.6, { label: 'Take firewood', use: () => game.actions.takeFirewood() });
-  B.hit(0.7, 0.6, 0.7, 0.6, 0.3, 2.6, { label: () => game.actions.chopLabel(), use: () => game.actions.chop() });
+  B.hit(0.7, 0.6, 0.7, 0.6, 0.3, 2.6, { label: () => game.actions.chopLabel(), use: () => game.actions.chop(), held: (e) => e.defId === 'log' || e.defId === 'axe' });
   // log pile (unsplit)
   const logs = new THREE.Group();
   for (let i = 0; i < 9; i++) {
@@ -363,8 +365,8 @@ function buildVillage(game) {
     B.add(PR.gasPump(), -1.8, 0.08, 3.5); B.col(0.8, 1.7, 0.5, -1.8, 0.9, 3.5);
     B.add(PR.gasPump(), 1.8, 0.08, 3.5); B.col(0.8, 1.7, 0.5, 1.8, 0.9, 3.5);
     game.spots.pumps = [B.w(-1.8, 1.0, 3.5), B.w(1.8, 1.0, 3.5)];
-    B.hit(0.8, 1.7, 0.8, -1.8, 0.9, 3.5, { label: () => game.actions.pumpLabel(), use: () => game.actions.pump(0) });
-    B.hit(0.8, 1.7, 0.8, 1.8, 0.9, 3.5, { label: () => game.actions.pumpLabel(), use: () => game.actions.pump(1) });
+    B.hit(0.8, 1.7, 0.8, -1.8, 0.9, 3.5, { label: () => game.actions.pumpLabel(), use: () => game.actions.pump(0), held: (e) => e.def.fluid === 'fuel' });
+    B.hit(0.8, 1.7, 0.8, 1.8, 0.9, 3.5, { label: () => game.actions.pumpLabel(), use: () => game.actions.pump(1), held: (e) => e.def.fluid === 'fuel' });
     // kiosk building (closed box)
     B.box(5, 3, 4, 0, 1.5, -3.5, M.whitePaint);
     const kb = new Builder(game, P.gas.x, y, P.gas.z, 0);

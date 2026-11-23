@@ -79,10 +79,11 @@ export class Player {
     let mx = 0, mz = 0;
     if (!this.frozen && !g.uiBlocking) {
       mz = inp.axis('KeyS', 'KeyW'); mx = inp.axis('KeyA', 'KeyD');
+      if (inp.analog && inp.analog.active) { mz = -inp.analog.y; mx = inp.analog.x; }
     }
     const crouching = !this.frozen && inp.down('KeyC');
     this.crouch = damp(this.crouch, crouching ? 1 : 0, 10, dt);
-    const sprint = inp.down('ShiftLeft') && !crouching && this.n.fatigue < 95;
+    const sprint = (inp.down('ShiftLeft') || (inp.analog?.active && Math.hypot(inp.analog.x, inp.analog.y) > 0.97 && inp.mobile)) && !crouching && this.n.fatigue < 95;
     let speed = crouching ? 1.6 : sprint ? 6.2 : 3.6;
     const drunk = this.n.drunk;
     if (this.n.fatigue > 85) speed *= 0.75;

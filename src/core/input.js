@@ -1,6 +1,10 @@
-// Keyboard / mouse input with pointer lock.
+// Keyboard / mouse input with pointer lock; touch controls feed the same state on phones.
+import { IS_MOBILE } from './device.js';
 export class Input {
   constructor(canvas) {
+    this.mobile = IS_MOBILE;
+    this.analog = { x: 0, y: 0, active: false };
+    this.lookScale = 1;
     this.canvas = canvas;
     this.keys = new Set();
     this.pressed = new Set();   // pressed this frame
@@ -49,13 +53,20 @@ export class Input {
     });
   }
 
+  // virtual key presses from touch buttons
+  press(code) { if (!this.keys.has(code)) { this.pressed.add(code); this.keyHoldTime[code] = performance.now(); } this.keys.add(code); }
+  release(code) { if (this.keys.has(code)) this.released.add(code); this.keys.delete(code); }
+  tapKey(code) { this.press(code); setTimeout(() => this.release(code), 90); }
+  addLook(dx, dy) { this.mouse.dx += dx * this.lookScale; this.mouse.dy += dy * this.lookScale; }
+
   lock() {
+    if (this.mobile) { this.locked = true; return; }
     try {
       const p = this.canvas.requestPointerLock({ unadjustedMovement: true });
       if (p && p.catch) p.catch(() => { try { this.canvas.requestPointerLock(); } catch (e) {} });
     } catch (e) { try { this.canvas.requestPointerLock(); } catch (e2) {} }
   }
-  unlock() { if (document.pointerLockElement) document.exitPointerLock(); }
+  unlock() { if (this.mobile) { this.locked = false; this.keys.clear(); this.analog.active = false; this.analog.x = this.analog.y = 0; return; } if (document.pointerLockElement) document.exitPointerLock(); }
 
   down(code) { return this.enabled && this.keys.has(code); }
   hit(code) { return this.enabled && this.pressed.has(code); }

@@ -218,11 +218,14 @@ export class Interact {
     if (hit && hit.toi < this.holdDist) tp.copy(origin).addScaledVector(dir, Math.max(0.35, hit.toi - 0.15));
     const cur = e.body.translation();
     const strength = m > 30 ? 6 : 14;
-    const vx = (tp.x - cur.x) * strength, vy = (tp.y - cur.y) * strength, vz = (tp.z - cur.z) * strength;
-    e.body.setLinvel({ x: vx, y: vy, z: vz }, true);
-    // keep upright-ish orientation relative to view for consumables
     const dist = Math.hypot(tp.x - cur.x, tp.y - cur.y, tp.z - cur.z);
-    if (dist > 1.6) { this.drop(); return; }
+    // snagged on something for a moment: let go gently instead of flinging it
+    this.snagT = dist > 1.6 ? (this.snagT || 0) + dt : 0;
+    if (this.snagT > 0.3 || dist > 2.6) { e.body.setLinvel({ x: 0, y: 0, z: 0 }, true); this.snagT = 0; this.drop(); return; }
+    let vx = (tp.x - cur.x) * strength, vy = (tp.y - cur.y) * strength, vz = (tp.z - cur.z) * strength;
+    const sp = Math.hypot(vx, vy, vz), maxSp = 9;
+    if (sp > maxSp) { vx *= maxSp / sp; vy *= maxSp / sp; vz *= maxSp / sp; }
+    e.body.setLinvel({ x: vx, y: vy, z: vz }, true);
     if (inp.down('KeyR')) {
       const r = e.body.rotation(); _q.set(r.x, r.y, r.z, r.w);
       _q.premultiply(_q2.setFromAxisAngle(_up, dt * 2.5));
@@ -241,9 +244,23 @@ export class Interact {
         if (inp.hit('KeyE')) { const inst = e.part; this.held = null; this.clearGhost(); g.car.attach(inst, slot); return; }
       } else this.clearGhost();
     }
+    // stations that take the held item (stove, sauna stove, chopping block, fuel pump)
+    let station = null;
+    if (!this.ghost) {
+      this.ray.set(origin, dir); this.ray.far = 2.6;
+      const objs = [];
+      for (const it of g.interactables) if (it.held && it.pos.distanceToSquared(origin) < 16 && (typeof it.held !== 'function' || it.held(e))) objs.push(it.mesh);
+      const h = objs.length ? this.ray.intersectObjects(objs, false)[0] : null;
+      if (h) {
+        station = h.object.userData.interact;
+        const label = typeof station.label === 'function' ? station.label() : station.label;
+        this.prompt.keys = this.prompt.keys.filter(([k]) => k !== 'E');
+        this.prompt.keys.unshift(['E', label || 'Use']);
+      }
+    }
     if (inp.mouse.leftPressed) { this.drop(); return; }
     if (inp.mouse.rightPressed) { this.throwHeld(dir); return; }
-    if (inp.hit('KeyE') && def.use) def.use(g, e);
+    if (inp.hit('KeyE')) { if (station) station.use(); else if (def.use) def.use(g, e); }
   }
 
   showGhost(inst, slot) {
