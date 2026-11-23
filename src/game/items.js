@@ -3,6 +3,7 @@ import { mats } from '../world/mats.js';
 import { roundBox, canvasTexture } from '../core/util.js';
 import { tex } from '../core/assets.js';
 import { audio } from '../core/audio.js';
+import * as IM from './itemmodels.js';
 
 // ---------------------------------------------------------------- item meshes
 const labelCache = {};
@@ -203,6 +204,22 @@ export const ITEMS = {
     useLabel: (e) => `Unpack bag (${(e.data.contents || []).length} items)`, use: (g, e) => g.actions.unpackBag(e),
   },
 };
+
+// detailed models (itemmodels.js) replace the simple placeholder meshes above
+const BUILD = {
+  beer: () => IM.bottle(), emptyBottle: () => IM.bottle(0x4a2a08, 'KURKI', true), beerCase: () => IM.beerCase(),
+  lonkero: () => IM.can('#d02a40', '#ffffff', 'LONKERO'), soda: () => IM.can('#e8c820', '#1a4a1a', 'LIMU'),
+  milk: () => IM.milkCarton(), coffee: () => IM.thermos(),
+  sausage: () => IM.sausage(false), sausageCooked: () => IM.sausage(true), bread: () => IM.ryeBread(),
+  pizza: () => IM.pizzaBox(), pizzaHot: () => IM.pizzaHot(), chips: () => IM.chipsBag(), candy: () => IM.salmiakki(),
+  fishRaw: (e) => IM.fish(e?.data?.kind || 'perch'), fishCooked: () => IM.fish('perch', true),
+  oilCan: () => IM.jug(0xd8b020, 'MOOTTORI-\nÖLJY', '4 L · 10W-40'), coolant: () => IM.jug(0x30a040, 'JÄÄHDYTIN-\nNESTE', '4 L'), brakeFluid: () => IM.jug(0xe8e8e0, 'JARRU-\nNESTE', '1 L · DOT 4', 0.6),
+  fuelCan: () => IM.jerryCan(), sprayCan: (e) => IM.sprayCan(e?.data?.color ?? 0xb02018), axe: () => IM.axe(), log: () => IM.log(), firewood: () => IM.firewood(),
+  fishingRod: () => IM.fishingRod(), newspaper: () => IM.newspaper(), deliveryBox: (e) => IM.deliveryBox(e?.data?.dest), hayBale: () => IM.hayBale(),
+  mail: (e) => IM.letter(e?.data?.title), trophy: () => IM.trophy(), antler: () => IM.antler(), ratchet: () => IM.toolCase(0xb02018, 'RATCHET SET'),
+  afrGauge: () => IM.gauge(), firstAid: () => IM.firstAid(), shoppingBag: () => IM.shoppingBag(),
+};
+for (const [k, b] of Object.entries(BUILD)) if (ITEMS[k]) ITEMS[k].build = b;
 
 // ---------------------------------------------------------------- physical entity system
 export class Items {

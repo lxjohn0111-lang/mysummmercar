@@ -30,6 +30,7 @@ import { Dialog } from './dialog.js';
 import { Tutorial } from './tutorial.js';
 import { TouchControls } from '../core/touch.js';
 import { IS_MOBILE } from '../core/device.js';
+import { updateTweens, updateTimers } from '../core/tween.js';
 import { BuildCar } from '../vehicles/buildcar.js';
 import { Van, Tractor, Moped } from '../vehicles/fleet.js';
 import { PARTS, SLOTS } from '../vehicles/parts.js';
@@ -151,6 +152,8 @@ export class Game {
     this.setLoad(0.82, 'Unpacking the garage…');
     const loaded = this.loadGame(true);
     if (loaded && !this.state.tut) this.tutorial.fastForward();
+    if (this.state.tvOn) this.actions.setTV(true);
+    if (!this.state.fridge) this.state.fridge = {};
     if (!loaded) this.newWorld();
     this.applySettings();
     this.setLoad(0.9, 'Loading textures…');
@@ -333,8 +336,7 @@ export class Game {
     // house supplies (on the kitchen table)
     const t = this.spots.fridgeDrop.clone().add(new THREE.Vector3(1.9, -0.05, 0.6));
     const bc = this.items.spawn('beerCase', t.clone().add(new THREE.Vector3(0.0, 0.2, 0))); bc.count = 6;
-    this.items.spawn('sausage', t.clone().add(new THREE.Vector3(-0.4, 0.15, 0.1)));
-    this.items.spawn('sausage', t.clone().add(new THREE.Vector3(-0.4, 0.25, 0.1)));
+    this.state.fridge = { sausage: 2, beer: 2, milk: 1, soda: 1 };
     this.items.spawn('bread', t.clone().add(new THREE.Vector3(0.35, 0.15, 0.1)));
     this.items.spawn('milk', t.clone().add(new THREE.Vector3(0.35, 0.25, -0.2)));
     this.items.spawn('axe', this.spots.choppingBlock.clone().add(new THREE.Vector3(0.7, 0.4, 0.2)));
@@ -349,7 +351,7 @@ export class Game {
     this.player.teleport(this.spots.garage.clone().add(new THREE.Vector3(-1.0, 0.1, 6.8)), 0);
     this.garageDoor.toggle();
     this.sky.setWeatherNow({ clouds: 0.3, rain: 0, wind: 0.3, storm: 0 });
-    this.state.mail = [{ kind: 'gift', title: 'Letter from your uncle', text: 'Hi kid! The Ruska is in the garage. All the parts are there, mostly. Spark plugs are shot and you\'ll need a fan belt and an oil filter from Rautala. Battery needs charging. Keys are in the ignition. Don\'t burn the house down. — Uncle Veikko<br><br>P.S. here is some money for parts.', amount: 300 }];
+    this.state.mail = [{ kind: 'gift', uncle: true, title: 'Letter from your uncle', text: 'Hi kid! The Ruska is in the garage. All the parts are there, mostly. Spark plugs are shot and you\'ll need a fan belt and an oil filter from Rautala. Battery needs charging. Keys are in the ignition. Don\'t burn the house down. — Uncle Veikko<br><br>P.S. here is some money for parts.', amount: 300 }];
   }
 
   layoutGarageParts(insts) {
@@ -575,7 +577,8 @@ export class Game {
     const inp = this.input;
     this.touch?.update();
     if (this.paused || this.modalOpen) {
-      // still render (frozen) so menus show the world behind
+      // still render (frozen) so menus show the world behind; doors and lids keep animating
+      if (this.modalOpen) updateTweens(dt);
       this.renderFrame(0.0001);
       inp.endFrame();
       return;
@@ -622,6 +625,8 @@ export class Game {
     this.jobs.update(dt);
     this.rally.update(dt);
     this.actions.updateSauna(dt, gameDt);
+    updateTweens(dt); updateTimers(dt);
+    this.actions.updateHome(dt);
     this.actions.updateFishing(dt);
     this.radio.update(dt);
     // doors animation

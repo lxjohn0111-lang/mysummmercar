@@ -3,12 +3,15 @@ import { audio } from '../core/audio.js';
 import { clamp, rand, pick, fmtMoney, fmtTime, DAYS } from '../core/util.js';
 import { PARTS, SLOTS } from '../vehicles/parts.js';
 import { ITEMS } from './items.js';
+import { tween, after } from '../core/tween.js';
 import { LINES } from './npcs.js';
 import { WATER_LEVEL, P } from '../world/layout.js';
 
 const PAINTS = [['Ruska red', 0x8a2a1a], ['Lake blue', 0x1e4a7a], ['Forest green', 0x2a4a2a], ['Sunny yellow', 0xe0b020], ['Snow white', 0xeeeee8], ['Night black', 0x111114], ['Rally orange', 0xd85a10], ['Sauna brown', 0x5a3a22]];
 
 // Central gameplay actions invoked from interactables, items and UI.
+const FRIDGE_OK = ['beer', 'lonkero', 'soda', 'milk', 'coffee', 'sausage', 'sausageCooked', 'bread', 'pizza', 'pizzaHot', 'chips', 'candy', 'fishRaw', 'fishCooked'];
+
 export class Actions {
   constructor(game) {
     this.game = game;
@@ -84,25 +87,42 @@ export class Actions {
     if (g.spots.toilet.distanceTo(g.player.pos) > 3) g.achieve('pee', 'Nature Calls', 'Relieved yourself in nature');
   }
   toilet() {
-    const g = this.g;
-    if (g.player.n.bladder < 8) { g.ui.toast('You don\'t need to go.'); return; }
+    const g = this.g, T = g.home?.toilet?.userData.parts;
+    if (T) { tween(T.lid, 'rotation.x', -1.75, 0.4); after(2.6, () => tween(T.lid, 'rotation.x', 0, 0.5)); }
+    if (g.player.n.bladder < 8) { g.ui.toast('You don\'t need to go right now.'); return; }
     g.player.n.bladder = 0; g.player.n.stress = Math.max(0, g.player.n.stress - 5);
-    audio.play('pour', g.camera.position, 2); g.ui.toast('Ahh. Much better.');
+    audio.play('pour', g.camera.position, 2); after(1.4, () => audio.play('pour', g.camera.position, 1.2));
+    g.ui.toast('Ahh. Much better. *flush*');
   }
   drinkTap() {
-    const g = this.g;
+    const g = this.g, S = g.home?.sink?.userData.parts;
+    if (S?.lever) {
+      tween(S.lever, 'rotation.x', -0.6, 0.2);
+      S.water.visible = true; S.water.scale.set(1, 1, 1);
+      after(1.6, () => { tween(S.lever, 'rotation.x', 0, 0.25); S.water.visible = false; });
+    }
     g.player.n.thirst = Math.max(0, g.player.n.thirst - 25); g.player.n.bladder = Math.min(100, g.player.n.bladder + 8);
-    audio.play('pour', g.camera.position, 0.8); setTimeout(() => audio.play('gulp', g.camera.position), 500);
+    audio.play('pour', g.camera.position, 0.8); after(0.8, () => audio.play('gulp', g.camera.position));
+    g.ui.toast('Cold, fresh well water.');
   }
+  // fridge: the door opens, the light comes on and you take or store food
   fridge() {
-    const g = this.g;
-    g.ui.toast('The fridge hums. Put food in there to keep it cold (it is just a fridge).');
+    const g = this.g, F = g.home?.fridge?.userData.parts;
+    const stock = g.state.fridge ||= {};
+    if (F) { tween(F.door, 'rotation.y', 1.8, 0.45); F.light.material.emissiveIntensity = 1.8; audio.play('creak', g.camera.position, 0.5); }
+    const close = () => { if (F) { tween(F.door, 'rotation.y', 0, 0.4, { onDone: () => { F.light.material.emissiveIntensity = 0; audio.play('door', g.camera.position, 0.5); } }); } };
+    const held = g.interact.held;
+    const opts = [];
+    if (held && !held.part && FRIDGE_OK.includes(held.defId)) opts.push({ label: `Put the ${held.def.name.toLowerCase()} in the fridge`, action: () => { stock[held.defId] = (stock[held.defId] || 0) + 1; g.items.remove(held); } });
+    for (const [id, n] of Object.entries(stock)) if (n > 0 && ITEMS[id]) opts.push({ label: `Take: ${ITEMS[id].name}`, sub: `${n} in the fridge`, action: () => { stock[id]--; after(0.1, () => this.spawnInHand(id)); } });
+    if (!opts.length) opts.push({ label: 'It is empty. (Buy food at the village shop.)', disabled: true });
+    after(0.4, () => g.ui.menu({ title: '🧊 Fridge', text: 'Cold and humming. What do you want?', options: opts, onClose: close }));
   }
   tv() {
     const g = this.g;
     g.state.tvOn = !g.state.tvOn;
-    const screen = g.homeTV?.getObjectByName('screen');
-    if (screen) { screen.material.emissive.setHex(g.state.tvOn ? 0x6080a0 : 0); screen.material.emissiveIntensity = g.state.tvOn ? 1.5 : 0; }
+    this.setTV(g.state.tvOn);
+    audio.play('click', g.camera.position);
     if (g.state.tvOn) {
       const shows = ['Ski jumping reruns. Somehow relaxing.', 'A documentary about moose. Gripping.', 'Weather forecast: summer continues.', 'Humppa hour. Your foot starts tapping.', 'A game show where people guess sausage weights.'];
       g.ui.toast(`📺 ${pick(shows)}`, 4);
@@ -117,12 +137,109 @@ export class Actions {
     g.items.remove(e);
     audio.play('hiss', g.camera.position);
     g.ui.toast('Cooking... sizzle sizzle.');
+    this.heatPlate(0, 14);
     g.advanceTime(10);
     // the cooked food lands back in your hand
     const hand = g.camera.position.clone().add(new THREE.Vector3(0, 0, -0.75).applyQuaternion(g.camera.quaternion));
     const ne = g.items.spawn(to, hand);
     g.interact.pickUp(ne);
     g.ui.toast('Cooked! Press E to eat it.');
+  }
+
+  // hotplate glows red while it cools down, with a wisp of steam
+  heatPlate(i, sec) {
+    const S = this.g.home?.stove?.userData.parts; if (!S) return;
+    const p = S.plates[i]; this.hot = { p, lamp: S.lamp, t: sec, T: sec };
+  }
+  updateHome(dt) {
+    const g = this.g;
+    const h = this.hot;
+    if (h) {
+      h.t -= dt; const k = Math.max(0, Math.min(1, h.t / (h.T * 0.6)));
+      h.p.material.emissiveIntensity = k * 1.6; h.lamp.material.emissiveIntensity = h.t > 0 ? 2 : 0;
+      if (h.t > 2 && Math.random() < dt * 6) { const w = h.p.getWorldPosition(new THREE.Vector3()); g.particles.emit(w.add(new THREE.Vector3(0, 0.08, 0)), { color: 0xdddddd, alpha: 0.18, size: 0.08, grow: 1.5, life: 1.6, vel: new THREE.Vector3((Math.random() - 0.5) * 0.1, 0.35, (Math.random() - 0.5) * 0.1) }); }
+      if (h.t <= 0) this.hot = null;
+    }
+    const W = g.home?.sink?.userData.parts?.water;
+    if (W?.visible) W.scale.set(0.85 + Math.random() * 0.3, 1, 0.85 + Math.random() * 0.3);
+    // TV picture
+    if (g.state.tvOn && this.tvTex && g.homeTV && g.homeTV.position && g.camera.position.distanceToSquared(g.spots.homeDoor) < 400) {
+      this.tvT = (this.tvT || 0) + dt;
+      if (this.tvT > 0.12) { this.tvT = 0; this.drawTV(); }
+    }
+    this.updateMailbox();
+    // charger feedback
+    const C = g.chargerObj?.getObjectByName('chargerNeedle');
+    if (C) { const on = !!this.chargingBattery && (this.chargingBattery.data.charge ?? 0) < 1; C.rotation.z += ((on ? -0.6 + Math.sin(performance.now() / 700) * 0.04 : 0.6) - C.rotation.z) * Math.min(1, dt * 3); const led = g.chargerObj.getObjectByName('chargerLed'); led.material.emissiveIntensity = this.chargingBattery ? ((this.chargingBattery.data.charge ?? 0) >= 1 ? 2 : (Math.sin(performance.now() / 300) > 0 ? 2 : 0.2)) : 0; }
+    const rd = g.garageRadioObj?.userData.parts?.dial;
+    if (rd) rd.material.emissiveIntensity = g.radio?.garageOn ? 1.2 : 0;
+  }
+  setTV(on) {
+    const g = this.g, screen = g.homeTV?.getObjectByName('screen'); if (!screen) return;
+    if (!this.tvTex) {
+      this.tvCanvas = document.createElement('canvas'); this.tvCanvas.width = 160; this.tvCanvas.height = 120;
+      this.tvTex = new THREE.CanvasTexture(this.tvCanvas); this.tvTex.colorSpace = THREE.SRGBColorSpace;
+    }
+    screen.material.emissiveMap = on ? this.tvTex : null;
+    screen.material.emissive.setHex(on ? 0xffffff : 0); screen.material.emissiveIntensity = on ? 1.1 : 0;
+    screen.material.needsUpdate = true;
+    this.tvShow = Math.floor(Math.random() * 3); this.tvClock = 0;
+    if (on) this.drawTV();
+  }
+  drawTV() {
+    const c = this.tvCanvas.getContext('2d'), W = 160, H = 120;
+    this.tvClock = (this.tvClock || 0) + 0.12;
+    const t = this.tvClock;
+    if (this.tvShow === 0) { // ski jumping
+      const gr = c.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#7ab0e8'); gr.addColorStop(1, '#dfefff'); c.fillStyle = gr; c.fillRect(0, 0, W, H);
+      c.fillStyle = '#f4f8ff'; c.beginPath(); c.moveTo(0, 40); c.quadraticCurveTo(70, 70, 160, 110); c.lineTo(160, 120); c.lineTo(0, 120); c.fill();
+      c.fillStyle = '#2a4a2a'; for (let i = 0; i < 12; i++) c.fillRect(((i * 37 - t * 30) % 180 + 180) % 180 - 10, 95 + (i % 3) * 6, 6, 14);
+      const x = (t * 40) % 200 - 20; c.fillStyle = '#c02020'; c.save(); c.translate(x, 40 + x * 0.35); c.rotate(0.5); c.fillRect(-8, -3, 16, 6); c.fillStyle = '#222'; c.fillRect(-14, 3, 30, 2); c.restore();
+      c.fillStyle = 'rgba(0,0,40,0.7)'; c.fillRect(0, 100, 80, 14); c.fillStyle = '#fff'; c.font = 'bold 9px Arial'; c.fillText('LAHTI  K90  128.5 m', 4, 110);
+    } else if (this.tvShow === 1) { // moose documentary
+      c.fillStyle = '#4a6a3a'; c.fillRect(0, 0, W, H); c.fillStyle = '#9ac0e0'; c.fillRect(0, 0, W, 45);
+      c.fillStyle = '#2a3a22'; for (let i = 0; i < 9; i++) { c.beginPath(); c.moveTo(i * 20 - 4, 50); c.lineTo(i * 20 + 6, 8 + (i % 3) * 6); c.lineTo(i * 20 + 16, 50); c.fill(); }
+      const x = 40 + Math.sin(t * 0.4) * 30; c.fillStyle = '#3a2416'; c.fillRect(x, 60, 46, 22); c.fillRect(x + 40, 52, 16, 16); for (const lx of [4, 14, 32, 40]) c.fillRect(x + lx, 80, 5, 22 + Math.sin(t * 3 + lx) * 2);
+      c.fillStyle = '#c8b890'; c.fillRect(x + 46, 44, 18, 4); c.fillRect(x + 44, 40, 4, 8); c.fillRect(x + 58, 40, 4, 8);
+    } else { // test card
+      const bars = ['#c0c0c0', '#c0c000', '#00c0c0', '#00c000', '#c000c0', '#c00000', '#0000c0']; bars.forEach((b, i) => { c.fillStyle = b; c.fillRect(i * W / 7, 0, W / 7 + 1, 80); });
+      c.fillStyle = '#111'; c.fillRect(0, 80, W, 40); c.fillStyle = '#fff'; c.font = 'bold 12px Arial'; c.fillText('YLE TV1', 52, 100); c.font = '10px monospace'; const d = new Date(0, 0, 0, 0, 0, Math.floor(t)); c.fillText(d.toTimeString().slice(0, 8), 54, 114);
+    }
+    // scanlines + snow
+    c.fillStyle = 'rgba(0,0,0,0.18)'; for (let y = 0; y < H; y += 3) c.fillRect(0, y, W, 1);
+    for (let i = 0; i < 120; i++) { c.fillStyle = Math.random() < 0.5 ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.25)'; c.fillRect(Math.random() * W, Math.random() * H, 1, 1); }
+    this.tvTex.needsUpdate = true;
+  }
+
+  // ---------------------------------------------------------------- mail: the mailbox opens and you read the letters right there
+  mailboxLabel() {
+    const n = (this.g.state.mail || []).length;
+    return n ? `Mailbox — ${n} letter${n > 1 ? 's' : ''} inside` : 'Mailbox (empty)';
+  }
+  setMailbox(open) {
+    const P = this.g.homeMailbox?.userData.parts; if (!P) return;
+    tween(P.door, 'rotation.x', open ? 1.55 : 0, open ? 0.45 : 0.35);
+    audio.play(open ? 'creak' : 'click', this.g.spots.mailbox, 0.8);
+  }
+  updateMailbox() {
+    const g = this.g, P = g.homeMailbox?.userData.parts; if (!P) return;
+    const has = (g.state.mail || []).length > 0;
+    if (has !== this._mbHas) { this._mbHas = has; tween(P.flag, 'rotation.x', has ? -Math.PI / 2 : 0, 0.6); P.letters.visible = has; }
+  }
+  readMailQueue(queue) {
+    const g = this.g;
+    const m = queue.shift();
+    if (!m) { this.setMailbox(false); return; }
+    (g.state.tutFlags ||= {}).letter = true;
+    const remove = () => { const i = (g.state.mail || []).indexOf(m); if (i >= 0) g.state.mail.splice(i, 1); };
+    const opts = [];
+    if (m.kind === 'gift') opts.push({ label: `Take the money (${fmtMoney(m.amount)})`, action: () => { remove(); g.earn(m.amount, m.title); } });
+    else if (m.kind === 'bill') {
+      opts.push({ label: `Pay now (${fmtMoney(m.amount)})`, disabled: g.state.money < m.amount, action: () => { remove(); g.spend(m.amount); g.state.bills = Math.max(0, (g.state.bills || 0) - 1); g.ui.toast('Bill paid.'); } });
+      opts.push({ label: 'Leave it in the mailbox for now' });
+    } else opts.push({ label: 'OK', action: () => { remove(); } });
+    const more = queue.length ? `<br><br><small>${queue.length} more letter${queue.length > 1 ? 's' : ''} in the mailbox.</small>` : '';
+    g.ui.menu({ title: `✉ ${m.title}`, text: m.text + more, options: opts, onClose: () => after(0.3, () => this.readMailQueue(queue)) });
   }
 
   // ---------------------------------------------------------------- sleep / pass out
@@ -541,11 +658,10 @@ export class Actions {
   // ---------------------------------------------------------------- mail, phone
   mailbox() {
     const g = this.g;
-    const mail = g.state.mail || [];
-    if (!mail.length) { g.ui.toast('The mailbox is empty.'); return; }
-    for (const m of mail) this.spawnNear('mail', g.spots.mailbox.clone().add(new THREE.Vector3(0, -0.5, 0)), { data: m });
-    g.state.mail = [];
-    audio.play('creak', g.spots.mailbox);
+    const mail = g.state.mail ||= [];
+    this.setMailbox(true);
+    if (!mail.length) { g.ui.toast('The mailbox is empty. New mail comes in the morning.'); after(1.4, () => this.setMailbox(false)); return; }
+    after(0.5, () => this.readMailQueue([...mail]));
   }
   readMail(e) {
     const g = this.g, m = e.data;
@@ -567,8 +683,11 @@ export class Actions {
     if (mail.length) g.ui.toast('📬 You have mail.', 3);
   }
   phone() {
-    const g = this.g;
-    g.ui.menu({
+    const g = this.g, H = g.home?.phone?.userData.parts?.handset;
+    if (H) { tween(H, 'position.y', 0.24, 0.3); tween(H, 'rotation.z', 0.5, 0.3); }
+    audio.play('click', g.camera.position);
+    after(0.35, () => g.ui.menu({
+      onClose: () => { if (H) { tween(H, 'position.y', 0.13, 0.3); tween(H, 'rotation.z', 0, 0.3); } },
       title: '☎ Telephone', text: 'Who do you want to call?',
       options: [
         { label: 'Rautalan Varaosa — order parts', sub: 'Delivered to your garage the next morning (+80 mk)', action: () => { setTimeout(() => this.shop('parts', true), 50); } },
@@ -577,7 +696,7 @@ export class Actions {
         { label: 'Pizza Kurkimäki — order a pizza', sub: '28 mk, delivered to your porch', disabled: g.state.money < 28, action: () => { g.spend(28); g.ui.toast('Pizza ordered. 30 minutes or so.'); g.state.pizzaAt = g.time.minutes + 30; } },
         { label: 'Call a random number', action: () => { this.prankCall(); } },
       ],
-    });
+    }));
   }
   prankCall() {
     const lines = ['"Hello? Is this the sausage factory? ...No? Then why did you answer?"', '"...*heavy breathing*... sorry, wrong number."', '"This is your neighbour Pertti. Do you have beer? No? *click*"', '"Have you considered upgrading your phone line to the new digital—" *you hang up*', '"Is your refrigerator running? Then you\'d better go catch it!" ...You prank called yourself somehow.'];

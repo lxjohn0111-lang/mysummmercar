@@ -72,17 +72,18 @@ function buildHome(game) {
 
   // ---- furniture
   const fy = F;
-  B.add(PR.counter(2.4, true), 2.6, fy, -D / 2 + 0.42, 0);
+  game.home = {};
+  game.home.sink = B.add(PR.counter(2.4, true), 2.6, fy, -D / 2 + 0.42, 0);
   B.col(2.4, 0.9, 0.6, 2.6, fy + 0.45, -D / 2 + 0.42);
-  B.add(PR.stove(), 4.2, fy, -D / 2 + 0.42, 0); B.col(0.6, 0.9, 0.6, 4.2, fy + 0.45, -D / 2 + 0.42);
-  B.add(PR.fridge(), 0.5, fy, -D / 2 + 0.42, 0); B.col(0.6, 1.6, 0.6, 0.5, fy + 0.8, -D / 2 + 0.42);
+  game.home.stove = B.add(PR.stove(), 4.2, fy, -D / 2 + 0.42, 0); B.col(0.6, 0.9, 0.6, 4.2, fy + 0.45, -D / 2 + 0.42);
+  game.home.fridge = B.add(PR.fridge(), 0.5, fy, -D / 2 + 0.42, 0); B.col(0.6, 1.6, 0.6, 0.5, fy + 0.8, -D / 2 + 0.42);
   B.add(PR.table(1.3, 0.85), 2.4, fy, -0.3, 0); B.col(1.3, 0.78, 0.85, 2.4, fy + 0.39, -0.3);
   B.add(PR.chair(), 2.0, fy, 0.35, Math.PI); B.add(PR.chair(), 2.8, fy, 0.35, Math.PI); B.add(PR.chair(), 2.4, fy, -0.95, 0);
   B.add(PR.sofa(), 1.6, fy, D / 2 - 0.55, Math.PI); B.col(1.9, 0.8, 0.8, 1.6, fy + 0.4, D / 2 - 0.55);
   const tvp = B.add(PR.tv(), 1.6, fy, 1.0, 0); B.col(0.7, 0.9, 0.45, 1.6, fy + 0.45, 1.0);
-  game.homeTV = tvp;
+  game.homeTV = tvp; game.home.tv = tvp;
   B.add(PR.rug(2.2, 1.5), 1.6, fy + 0.005, 2.0);
-  const ph = PR.phone(); B.add(ph, W / 2 - 0.25, fy + 1.0, 2.6, -Math.PI / 2);
+  const ph = PR.phone(); B.add(ph, W / 2 - 0.25, fy + 1.0, 2.6, -Math.PI / 2); game.home.phone = ph;
   B.box(0.3, 0.04, 0.25, W / 2 - 0.2, fy + 0.98, 2.6, M.darkWood, { col: false });
   game.spots.phone = B.w(W / 2 - 0.25, fy + 1.1, 2.6);
   const clk = PR.clock(); B.add(clk, 2.6, fy + 2.0, -D / 2 + 0.11, 0); game.homeClock = clk;
@@ -96,7 +97,7 @@ function buildHome(game) {
   B.add(PR.shelf(1.0, 1.9, 0.5, 4, M.darkWood), -1.3, fy, -D / 2 + 0.3, 0); B.col(1.0, 1.9, 0.5, -1.3, fy + 0.95, -D / 2 + 0.3);
   B.add(PR.rug(1.6, 1.0, 0x2a4a6a), -2.6, fy + 0.005, -1.0);
   B.add(PR.lamp(1.2), -3.0, fy, -3.0);
-  B.add(PR.toilet(), -4.5, fy, 2.8, Math.PI);
+  game.home.toilet = B.add(PR.toilet(), -4.5, fy, 2.8, Math.PI);
   game.spots.toilet = B.w(-4.5, fy + 0.4, 2.8);
   B.add(PR.counter(0.7, true), -4.4, fy, 1.95, 0);
   // interactions
@@ -120,12 +121,17 @@ function buildHome(game) {
   B.add(fp, fpx, game.terrain.getHeight(P.home.x + fpx, P.home.z + fpz) - y, fpz);
   game.flags.push(fp.userData.flag);
   const mbx = -386 + 3.5, mbz = 584;
-  const mb = PR.mailbox('KOTI');
-  mb.position.set(mbx, game.terrain.getHeight(mbx, mbz), mbz); mb.rotation.y = 0;
+  const mb = PR.mailbox('KOTI', '12');
+  const mgy = game.terrain.getHeight(mbx, mbz);
+  const mry = Math.atan2(P.home.x - mbx, P.home.z - mbz); // door faces the house
+  mb.position.set(mbx, mgy, mbz); mb.rotation.y = mry;
   game.scene.add(mb);
-  const mbIt = { mesh: null, pos: V(mbx, game.terrain.getHeight(mbx, mbz) + 1.2, mbz), label: 'Mailbox', use: () => game.actions.mailbox() };
-  const mbHit = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.6), M.hidden); mbHit.position.copy(mbIt.pos); game.scene.add(mbHit); mbHit.updateMatrixWorld();
-  mbIt.mesh = mbHit; game.interactables.push(mbIt);
+  game.homeMailbox = mb;
+  const boxPos = V(mbx, mgy + mb.userData.boxY, mbz);
+  const mbHit = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.7), M.hidden); mbHit.position.copy(boxPos); mbHit.rotation.y = mry; game.scene.add(mbHit); mbHit.updateMatrixWorld();
+  const mbIt = { mesh: mbHit, pos: boxPos.clone(), label: () => game.actions.mailboxLabel(), use: () => game.actions.mailbox() };
+  mbHit.userData.interact = mbIt; // (this link was missing before, so the mailbox could never be used)
+  game.interactables.push(mbIt);
   game.spots.mailbox = mbIt.pos.clone();
   // apple tree-ish bush and garden table
   B.add(PR.table(1.4, 0.8, 0.72, M.whitePaint), W / 2 + 3.5, 0.0 - 0.02, 5.5);
@@ -177,15 +183,14 @@ function buildGarage(game) {
   const hoist = PR.engineHoist(); B.add(hoist, -2.6, 0.06, -1.6, Math.PI); game.engineHoist = hoist;
   game.spots.hoist = B.w(-2.6, 0.06, -1.6);
   B.hit(0.6, 1.8, 1.4, -2.6, 0.9, -1.6, { label: () => game.actions.hoistLabel(), use: () => game.actions.hoist() });
-  const ch = PR.batteryCharger(); B.add(ch, -0.7, 0.96, -D / 2 + 0.5);
+  const ch = PR.batteryCharger(); B.add(ch, -0.7, 0.99, -D / 2 + 0.5); game.chargerObj = ch;
   game.spots.charger = B.w(-0.7, 1.1, -D / 2 + 0.75);
   B.hit(0.35, 0.3, 0.3, -0.7, 1.08, -D / 2 + 0.5, { label: () => game.actions.chargerLabel(), use: () => game.actions.charger() });
   B.add(PR.poster('RUSKA 1300\nHUOLTO-OHJE\n\nKiristä pultit!\nÖljy 3.5 L\nVesi 5 L', 0.55, 0.8, '#f0f0e0', '#202020'), 2.2, 1.7, -D / 2 + 0.11);
   B.add(PR.poster('KURKI-SPRINT\nRALLI\nLAUANTAISIN\nklo 12-18', 0.5, 0.7, '#ffd020', '#111'), -1.6, 1.7, -D / 2 + 0.11);
   // radio on workbench
-  const radio = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.18, 0.12), new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 0.5 }));
-  radio.position.set(1.1, 1.02, -D / 2 + 0.45); B.group.add(radio);
-  B.hit(0.4, 0.25, 0.25, 1.1, 1.02, -D / 2 + 0.45, { label: () => (game.radio?.garageOn ? 'Turn radio off' : 'Turn radio on'), use: () => game.actions.garageRadio(B.w(1.1, 1.1, -D / 2 + 0.45)) });
+  const radio = PR.radio(); B.add(radio, 1.1, 0.99, -D / 2 + 0.45, 0); game.garageRadioObj = radio;
+  B.hit(0.4, 0.25, 0.25, 1.1, 1.09, -D / 2 + 0.45, { label: () => (game.radio?.garageOn ? 'Turn radio off' : 'Turn radio on'), use: () => game.actions.garageRadio(B.w(1.1, 1.1, -D / 2 + 0.45)) });
   game.spots.garageRadio = B.w(1.1, 1.1, -D / 2 + 0.45);
   // car position on jack stands
   game.spots.carStands = B.w(0.4, 0.06, 0.6);
@@ -287,7 +292,7 @@ function buildShed(game) {
   // log pile (unsplit)
   const logs = new THREE.Group();
   for (let i = 0; i < 9; i++) {
-    const l = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.17, 2.2, 10), new THREE.MeshStandardMaterial({ map: tex('bark_birch.jpg'), roughness: 0.9 }));
+    const l = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.17, 2.2, 14), [new THREE.MeshStandardMaterial({ map: tex('bark_birch.jpg', { repeat: [2, 3] }), normalMap: tex('bark_birch_n.jpg', { srgb: false, repeat: [2, 3] }), roughness: 0.85 }), new THREE.MeshStandardMaterial({ color: 0xdcc094, roughness: 0.9 }), new THREE.MeshStandardMaterial({ color: 0xdcc094, roughness: 0.9 })]);
     l.rotation.z = Math.PI / 2; l.position.set(0, 0.16 + Math.floor(i / 4) * 0.28, (i % 4) * 0.33 - 0.5 + Math.floor(i / 4) * 0.16); l.castShadow = true; logs.add(l);
   }
   B.add(logs, -1.6, 0, 3.3, 0.2);

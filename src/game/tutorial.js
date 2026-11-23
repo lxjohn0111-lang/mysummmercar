@@ -51,12 +51,11 @@ function hasGoodPart(g, type, n = 1) {
 
 const STEPS = [
   { id: 'welcome', title: 'Welcome to Kurkijärvi!', always: true, text: 'Your uncle left you a house, a van and a car in pieces. Follow the yellow arrows!', auto: 5, reward: 0 },
-  { id: 'mailbox', title: 'Check the mailbox', target: (g) => g.spots.mailbox, radius: 3.5, text: 'Press {E} to open the mailbox.', done: (g) => (g.state.mail || []).length === 0, reward: 20 },
   {
-    id: 'letter', title: 'Read the letter',
-    target: (g) => g.items.list.find((e) => e.defId === 'mail')?.mesh.position.clone() || g.spots.mailbox, radius: 4.5,
-    text: 'Look at the letter on the ground and press {E} to read it. Take the money!',
-    done: (g) => g.state.tutFlags?.letter || !g.items.list.some((e) => e.defId === 'mail'), reward: 0,
+    id: 'mailbox', title: 'Check the mailbox', target: (g) => g.spots.mailbox, radius: 3.5,
+    text: 'Look at the blue mailbox and press {E}. It opens and you can read the letter. Take the money!',
+    farText: 'Your uncle left a letter. The mailbox is by the road.',
+    done: (g) => !!g.state.tutFlags?.letter || !(g.state.mail || []).some((m) => m.uncle), reward: 20,
   },
   { id: 'garage', title: 'Go to the garage', target: (g) => g.spots.garage.clone().add(new THREE.Vector3(0, 0, 3)), radius: 5, text: 'This is your Ruska 1300. It is in pieces. You will build it, part by part!', autoArrive: 4, reward: 25 },
   { id: 'list', title: 'Open the car list', always: true, text: 'Press {TAB} to open the car list. It shows every part the car still needs. Press {TAB} again to close it.', done: (g) => g.tutSheetSeen, reward: 15 },
@@ -68,10 +67,11 @@ const STEPS = [
     dyn(g) {
       const held = g.interact.held;
       if (held && held.defId === 'sausageCooked') return { always: true, text: 'Press {E} to eat it. Keep an eye on hunger and thirst in the corner!' };
-      if (held && held.defId === 'sausage') return { target: g.spots.stove, radius: 2.5, text: 'Press {E} at the stove to cook the sausage.' };
+      if (held && held.defId === 'sausage') return { target: g.spots.stove, radius: 2.5, text: 'Look at the stove and press {E} to cook the sausage.', farText: 'Take it to the stove.' };
       const s = g.items.list.find((e) => e.defId === 'sausage' || e.defId === 'sausageCooked');
-      if (!s) return { target: g.spots.shopFront, radius: 6, text: 'No food at home. Buy some at the village shop.' };
-      return { target: s.mesh.position.clone(), radius: 2.2, text: 'Pick up the sausage with {LMB}.' };
+      if (s) return { target: s.mesh.position.clone(), radius: 2.2, text: 'Pick up the sausage with {LMB}.' };
+      if ((g.state.fridge?.sausage || 0) > 0) return { target: g.home.fridge.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 1.0, 0)), radius: 2.6, text: 'Open the fridge with {E} and take a sausage.', farText: 'There is food in the fridge at home.' };
+      return { target: g.spots.shopFront, radius: 6, text: 'No food at home. Buy some at the village shop.' };
     },
     done: (g) => (g.stats.meals || 0) > 0, reward: 30,
   },
