@@ -138,14 +138,15 @@ export class TouchControls {
   update() {
     const g = this.game, P = g.player;
     const hidden = g.paused || g.modalOpen || !g.started || P.dead || P.sleeping;
-    this.root.style.display = hidden ? 'none' : 'block';
+    const rd = hidden ? 'none' : 'block'; if (this.rootD !== rd) { this.rootD = rd; this.root.style.display = rd; }
     if (hidden) return;
     const v = P.inVehicle;
     this.hintT = (this.hintT || 0) + 1;
     if (this.hintT > 900 && this.hint.style.opacity !== '0') this.hint.style.opacity = 0;
     const ht = v ? 'Drag left side to steer · drag right side to look around' : 'Drag left side to walk · drag right side to look';
     if (this.hint.textContent !== ht) this.hint.textContent = ht;
-    const show = (id, on) => { const b = this.btns[id]; if (b) b.el.style.display = on ? 'flex' : 'none'; };
+    const show = (id, on) => { const b = this.btns[id]; if (b && b.on !== on) { b.on = on; b.el.style.display = on ? 'flex' : 'none'; } };
+    const html = (id, s) => { const b = this.btns[id]; if (b && b.html !== s) { b.html = s; b.el.innerHTML = s; } };
     for (const b of Object.values(this.btns)) if (b.group === 'foot') show(b.def.id, !v);
     for (const b of Object.values(this.btns)) if (b.group === 'car') show(b.def.id, !!v);
     if (v) {
@@ -154,20 +155,20 @@ export class TouchControls {
       show('forkUp', tractor); show('forkDn', tractor); show('drop', tractor && !!v.bale);
       show('belt', v.kind !== 'moped' && v.kind !== 'tractor');
       show('up', v.kind !== 'moped'); show('down', v.kind !== 'moped');
-      this.btns.start.el.innerHTML = v.engineOn ? 'ENGINE<br>OFF' : 'START<br>(hold)';
+      html('start', v.engineOn ? 'ENGINE<br>OFF' : 'START<br>(hold)');
     } else {
       const it = g.interact;
       const tool = it.tool;
-      this.btns.tool.el.innerHTML = tool === 'wrench' ? '🔧' : tool === 'screwdriver' ? '🪛' : '✋';
+      html('tool', tool === 'wrench' ? '🔧' : tool === 'screwdriver' ? '🪛' : '✋');
       const held = !!it.held;
-      this.btns.grab.el.innerHTML = held ? 'DROP' : 'GRAB';
+      html('grab', held ? 'DROP' : 'GRAB');
       show('throw', held);
       const aimPart = it.target && it.target.kind === 'part';
       show('tighten', tool !== 'hands' && aimPart); show('loosen', tool !== 'hands' && aimPart);
-      this.btns.tighten.el.innerHTML = tool === 'screwdriver' ? 'TUNE +' : 'TIGHTEN';
-      this.btns.loosen.el.innerHTML = tool === 'screwdriver' ? 'TUNE −' : 'LOOSEN';
+      html('tighten', tool === 'screwdriver' ? 'TUNE +' : 'TIGHTEN');
+      html('loosen', tool === 'screwdriver' ? 'TUNE −' : 'LOOSEN');
       const canUse = !!(it.prompt && it.prompt.keys && it.prompt.keys.some(([k]) => k === 'E'));
-      this.btns.use.el.classList.toggle('ready', canUse);
+      if (this.btns.use.ready !== canUse) { this.btns.use.ready = canUse; this.btns.use.el.classList.toggle('ready', canUse); }
     }
   }
 }

@@ -158,6 +158,8 @@ export class Game {
     this.applySettings();
     this.setLoad(0.9, 'Loading textures…');
     await waitTextures((d, n) => this.setLoad(0.9 + 0.1 * (n ? d / n : 1)));
+    this.setLoad(0.99, 'Warming up the shaders…');
+    await this.precompile();
     // warm-up frame
     this.vegetation.updateLOD(this.camera.position, true);
     this.vegetation.updateColliders(this.player.pos);
@@ -569,7 +571,19 @@ export class Game {
   }
 
   // ---------------------------------------------------------------- main loop
+  // One bad frame must never freeze the game: errors are caught, reported once, and the frame still
+  // renders and clears input. Repeated errors from the same place are counted, not re-logged.
   tick() {
+    try { this.frameTick(); } catch (err) {
+      this.errors = this.errors || new Map();
+      const key = String(err && err.message).slice(0, 120);
+      const n = (this.errors.get(key) || 0) + 1; this.errors.set(key, n);
+      if (n === 1) { console.error('[game] frame error (recovered):', err); }
+      try { this.renderFrame(0.016); } catch (e2) {}
+      try { this.input.endFrame(); } catch (e3) {}
+    }
+  }
+  frameTick() {
     const now = performance.now();
     let dt = Math.min(0.05, (now - this.last) / 1000);
     this.last = now;
@@ -671,13 +685,14 @@ export class Game {
     this.fx.blur = Math.max(this.fx.drunk * 0.5, (this.fx.heat || 0) > 0.6 ? (this.fx.heat - 0.6) * 2 : 0);
     this.fx.fade = Math.max(0, this.fx.fade - dt * 1.2);
     if (n.health < 30) this.fx.hurt = Math.max(this.fx.hurt, 0.25 + 0.1 * Math.sin(now / 300));
-    // adaptive quality: drop a level if the frame rate stays low
+    // adaptive quality: drop a level if the frame rate stays low (never automatically down to Low:
+    // that switches the render path and recompiles every shader, which would itself cause a freeze)
     if (!this.settings.manualQuality) {
       this.perf = this.perf || { t: 0, frames: 0, cool: 6 };
       const pf = this.perf; pf.t += dt; pf.frames++; pf.cool -= dt;
       if (pf.t > 5) {
         const fps = pf.frames / pf.t;
-        if (pf.cool <= 0 && fps < 26 && this.settings.quality > 0) {
+        if (pf.cool <= 0 && fps < 26 && this.settings.quality > 1) {
           this.settings.quality--; this.applySettings(); pf.cool = 8;
           this.ui.toast(`Graphics lowered to ${QUALITY[this.settings.quality].name} for smoother play (change in Settings).`, 4);
         }
@@ -704,5 +719,35 @@ export class Game {
 
   renderFrame(dt) {
     this.post.render(dt, this.fx);
+    if (this.post.direct) this.fxOverlay(); else if (this.fxEl && this.fxEl._on) { this.fxEl.style.opacity = 0; this.fxEl._on = false; }
+  }
+  // Low quality: fade, injury, underwater and sleepiness as a DOM layer over the canvas
+  fxOverlay() {
+    if (!this.fxEl) {
+      const e = document.createElement('div');
+      e.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:4;opacity:0;';
+      document.body.appendChild(e); this.fxEl = e;
+    }
+    const f = this.fx, q = (v) => Math.round(Math.min(1, Math.max(0, v)) * 40) / 40;
+    const fade = q(f.fade), hurt = q(f.hurt), water = q(f.water ? 1 : 0), sleepy = q(f.sleepy + f.drunk * 0.25);
+    const key = `${fade}|${hurt}|${water}|${sleepy}`;
+    if (key === this.fxKey) return;
+    this.fxKey = key;
+    const layers = [];
+    if (fade > 0) layers.push(`linear-gradient(rgba(0,0,0,${fade}),rgba(0,0,0,${fade}))`);
+    if (hurt > 0) layers.push(`radial-gradient(ellipse at center, rgba(150,0,0,0) 35%, rgba(150,0,0,${0.55 * hurt}) 100%)`);
+    if (sleepy > 0) layers.push(`radial-gradient(ellipse at center, rgba(0,0,0,0) 30%, rgba(0,0,0,${0.85 * sleepy}) 100%)`);
+    if (water > 0) layers.push('linear-gradient(rgba(10,50,45,0.55),rgba(10,50,45,0.55))');
+    this.fxEl.style.background = layers.join(',') || 'none';
+    this.fxEl.style.opacity = layers.length ? 1 : 0; this.fxEl._on = layers.length > 0;
+  }
+  // compile every material's shader during loading so nothing stalls the first time it is seen
+  async precompile() {
+    const r = this.renderer;
+    try {
+      if (!this.post.direct) r.setRenderTarget(this.post.composer.readBuffer);
+      if (r.compileAsync) await r.compileAsync(this.scene, this.camera); else r.compile(this.scene, this.camera);
+    } catch (e) { console.warn('precompile failed', e); }
+    r.setRenderTarget(null);
   }
 }

@@ -26,7 +26,7 @@ function fitPart(type, slots, label) {
       if (held && held.part && held.part.def.type === type) {
         const free = slots.find((sl) => car.slotAvailable(sl, held.part)) || slots[0];
         const p = car.slotWorld(free) || car.pos;
-        return { target: p.clone(), radius: 2.6, text: 'Hold it under the arrow on the car. When a green ghost part appears, press {E} to fit it.', farText: 'Carry it to the arrow on the car.' };
+        return { target: p.clone(), radius: 2.6, text: 'Look at the arrow on the car while holding it. When the green ghost part appears, press {E} to fit it.', farText: 'Carry it to the arrow on the car.' };
       }
       // find the nearest loose part of this type
       let best = null, bd = 1e9;

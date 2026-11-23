@@ -18,6 +18,9 @@ export function keyText(text) {
 const PROMPT_TOUCH = { E: 'USE', LMB: 'GRAB', RMB: 'THROW', F: '🔧', 'Wheel↑/LMB': 'TIGHTEN', 'Wheel↓/RMB': 'LOOSEN', Wheel: 'TUNE ±', 3: '🔧' };
 const promptKey = (k) => (IS_MOBILE ? PROMPT_TOUCH[k] ?? null : k);
 
+// only touch the DOM when a value really changes (layout work every frame stutters on phones)
+function setDisp(el, d) { if (el._d !== d) { el._d = d; el.style.display = d; } }
+
 export class UI {
   constructor(game) {
     this.game = game;
@@ -85,7 +88,7 @@ export class UI {
   setGuide(gd) {
     const el = this.guideEl;
     this.guide = gd;
-    if (!gd) { el.classList.remove('show'); this.edgeEl.style.display = 'none'; this.lastGuide = ''; return; }
+    if (!gd) { if (this.guideShown !== false) { this.guideShown = false; el.classList.remove('show'); } setDisp(this.edgeEl, 'none'); this.lastGuide = ''; return; }
     const dist = gd.dist != null ? (gd.dist > 1000 ? `${(gd.dist / 1000).toFixed(1)} km` : `${Math.round(gd.dist)} m`) : '';
     const head = gd.step ? `<span class="gs">STEP ${gd.step}/${gd.total}</span>` : gd.interrupt ? '<span class="gs need">NEED</span>' : gd.job ? '<span class="gs job">JOB</span>' : '';
     const nav = gd.angle != null ? `<div class="gnav"><div class="garrow" style="transform:rotate(${(gd.angle * 180 / Math.PI).toFixed(0)}deg)">▲</div><div class="gdist">${dist}</div></div>` : gd.arrived && gd.text ? '<div class="gnav here"><div class="gok">✓</div><div class="gdist">HERE</div></div>' : '';
@@ -95,7 +98,7 @@ export class UI {
       this.lastGuide = key;
       el.innerHTML = `${nav}<div class="gbody"><div class="gt">${head}${gd.title}</div>${gd.text ? `<div class="gx">${keyText(gd.text)}</div>` : ''}${prog}</div>`;
     }
-    el.classList.add('show');
+    if (this.guideShown !== true) { this.guideShown = true; el.classList.add('show'); }
     const arrivedNow = !!(gd.arrived && gd.text);
     if (arrivedNow !== this.guideArrived) {
       this.guideArrived = arrivedNow;
@@ -104,7 +107,7 @@ export class UI {
     }
     // screen-edge pointer to the target
     const g = this.game;
-    if (!gd.target || g.uiBlocking) { this.edgeEl.style.display = 'none'; return; }
+    if (!gd.target || g.uiBlocking) { setDisp(this.edgeEl, 'none'); return; }
     const p = gd.target.clone(); p.y += 1.5;
     p.project(g.camera);
     const W = window.innerWidth, H = window.innerHeight;
@@ -113,9 +116,9 @@ export class UI {
     const m = 46;
     const onScreen = !behind && x > m && x < W - m && y > m + 60 && y < H - m;
     if (onScreen) {
-      this.edgeEl.className = 'gedge on';
-      this.edgeEl.style.transform = `translate(${x}px, ${y}px)`;
-      this.edgeEl.innerHTML = `<div class="ea">▼</div><div class="ed">${dist}</div>`;
+      if (this.edgeEl.className !== 'gedge on') this.edgeEl.className = 'gedge on';
+      this.edgeEl.style.transform = `translate(${x.toFixed(0)}px, ${y.toFixed(0)}px)`;
+      const eh = `<div class="ea">▼</div><div class="ed">${dist}</div>`; if (eh !== this.edgeH) { this.edgeH = eh; this.edgeEl.innerHTML = eh; }
     } else {
       // direction from the screen centre (flip when behind the camera)
       let dx = x - W / 2, dy = y - H / 2;
@@ -123,11 +126,11 @@ export class UI {
       const k = Math.min((W / 2 - m) / Math.max(1e-3, Math.abs(dx)), (H / 2 - m) / Math.max(1e-3, Math.abs(dy)));
       x = W / 2 + dx * k; y = H / 2 + dy * k;
       const ang = Math.atan2(dy, dx) * 180 / Math.PI + 90;
-      this.edgeEl.className = 'gedge off';
-      this.edgeEl.style.transform = `translate(${x}px, ${y}px)`;
-      this.edgeEl.innerHTML = `<div class="ea" style="transform:rotate(${ang.toFixed(0)}deg)">▲</div><div class="ed">${dist}</div>`;
+      if (this.edgeEl.className !== 'gedge off') this.edgeEl.className = 'gedge off';
+      this.edgeEl.style.transform = `translate(${x.toFixed(0)}px, ${y.toFixed(0)}px)`;
+      const eh = `<div class="ea" style="transform:rotate(${(Math.round(ang / 3) * 3).toFixed(0)}deg)">▲</div><div class="ed">${dist}</div>`; if (eh !== this.edgeH) { this.edgeH = eh; this.edgeEl.innerHTML = eh; }
     }
-    this.edgeEl.style.display = 'block';
+    setDisp(this.edgeEl, 'block');
   }
   celebrate(title, sub) {
     const e = this.celebEl;
@@ -156,20 +159,23 @@ export class UI {
     const pr = g.interact.prompt;
     if (pr.main && !g.uiBlocking) {
       let keys = pr.keys.map(([k, l]) => { if (!k) return `<span class="note">${l}</span>`; const kk = promptKey(k); return kk === null ? '' : `<span class="key">${kk}</span>${l}`; }).join('');
-      this.promptEl.innerHTML = `<div class="pm">${pr.main}</div>${pr.sub ? `<div class="ps">${pr.sub}</div>` : ''}<div class="pk">${keys}</div>`;
-      this.promptEl.style.display = 'block';
-    } else this.promptEl.style.display = 'none';
-    this.cross.classList.toggle('active', !!pr.main);
-    this.cross.style.display = P.inVehicle && P.inVehicle.camMode === 1 ? 'none' : 'block';
+      const html = `<div class="pm">${pr.main}</div>${pr.sub ? `<div class="ps">${pr.sub}</div>` : ''}<div class="pk">${keys}</div>`;
+      if (html !== this.lastPrompt) { this.promptEl.innerHTML = html; this.lastPrompt = html; }
+      setDisp(this.promptEl, 'block');
+    } else setDisp(this.promptEl, 'none');
+    if (this.crossActive !== !!pr.main) { this.crossActive = !!pr.main; this.cross.classList.toggle('active', this.crossActive); }
+    setDisp(this.cross, P.inVehicle && P.inVehicle.camMode === 1 ? 'none' : 'block');
     // needs
     for (const [k, o] of Object.entries(this.needBars)) {
       let v = P.n[k];
       if (k === 'drunk') v = Math.min(100, v * 80);
       const bad = k === 'health' ? 100 - v : v;
-      o.fill.style.width = `${clamp(v, 0, 100)}%`;
-      o.fill.style.background = k === 'health' ? (v < 35 ? '#e04030' : '#e86a6a') : bad > 85 ? '#e04030' : bad > 65 ? '#e8a030' : k === 'drunk' ? '#d8b040' : '#e8e2d0';
-      o.row.classList.toggle('warn', bad > 80);
-      o.row.style.display = (k === 'drunk' && v < 2) ? 'none' : 'flex';
+      const wq = Math.round(clamp(v, 0, 100) * 2) / 2;
+      if (wq !== o.w) { o.w = wq; o.fill.style.width = `${wq}%`; }
+      const col = k === 'health' ? (v < 35 ? '#e04030' : '#e86a6a') : bad > 85 ? '#e04030' : bad > 65 ? '#e8a030' : k === 'drunk' ? '#d8b040' : '#e8e2d0';
+      if (col !== o.col) { o.col = col; o.fill.style.background = col; }
+      if ((bad > 80) !== o.warn) { o.warn = bad > 80; o.row.classList.toggle('warn', o.warn); }
+      setDisp(o.row, (k === 'drunk' && v < 2) ? 'none' : 'flex');
     }
     // info
     const mins = g.time.minutes % 1440;
@@ -180,7 +186,9 @@ export class UI {
     if (this.subT > 0) { this.subT -= dt; if (this.subT <= 0) this.subEl.classList.remove('show'); }
     // vehicle
     const v = P.inVehicle;
-    if (v) {
+    this.vehT = (this.vehT || 0) - dt;
+    if (v && this.vehT > 0 && this.lastVeh === v) { /* keep the last panel */ } else if (v) {
+      this.vehT = 1 / 12; this.lastVeh = v;
       const st = v.engineStats();
       const gear = v.gear === 0 ? 'N' : v.gear < 0 ? 'R' : v.gear;
       const rpmPct = clamp(v.rpm / (st.redline * 1.05), 0, 1) * 100;
@@ -200,15 +208,17 @@ export class UI {
         <div class="gear">${gear}</div><div class="rpm"><div style="width:${rpmPct}%" class="${rpmPct > 88 ? 'red' : ''}"></div></div>
         <div class="vrow"><span>⛽ ${v.fuel.toFixed(1)} L</span>${v.isBuildCar ? `<span>🌡 ${Math.round(temp)}°C</span>` : ''}<span>${v.engineOn ? '<b class="on">ENGINE ON</b>' : v.ignition ? 'IGN' : 'OFF'}</span></div>
         <div class="vrow">${warn.join('')}</div>`;
-      this.vehEl.style.display = 'block';
-    } else this.vehEl.style.display = 'none';
-    this.toolEl.style.display = v ? 'none' : 'block';
+      setDisp(this.vehEl, 'block');
+    } else if (!v) { setDisp(this.vehEl, 'none'); this.lastVeh = null; }
+    setDisp(this.toolEl, v ? 'none' : 'block');
     // hints
     if (this.hintsShown && !IS_MOBILE) {
-      this.hintEl.innerHTML = v ? `<b>Driving</b> W/S gas/brake · A/D steer · Space handbrake<br>Shift/X gear up · Q/Z gear down · C clutch<br>I ignition (hold to crank) · K choke · L lights · B belt<br>H horn · R radio · N station · V camera · E exit${v.kind === 'tractor' ? '<br>R/F raise/lower bale spear · G drop bale' : ''}`
+      const hk = v ? v.kind : 'foot';
+      if (hk !== this.lastHints) this.hintEl.innerHTML = v ? `<b>Driving</b> W/S gas/brake · A/D steer · Space handbrake<br>Shift/X gear up · Q/Z gear down · C clutch<br>I ignition (hold to crank) · K choke · L lights · B belt<br>H horn · R radio · N station · V camera · E exit${v.kind === 'tractor' ? '<br>R/F raise/lower bale spear · G drop bale' : ''}`
         : `<b>On foot</b> WASD move · Shift run · Space jump · C crouch<br>LMB pick up · RMB throw · E use/attach · F tools<br>Wheel tighten/loosen bolts · P pee · T watch<br>Tab car checklist · M map · H hide hints · Esc pause`;
-      this.hintEl.style.display = 'block';
-    } else this.hintEl.style.display = 'none';
+      this.lastHints = hk;
+      setDisp(this.hintEl, 'block');
+    } else setDisp(this.hintEl, 'none');
     // compass + markers
     this.updateMarkers();
   }
@@ -220,16 +230,17 @@ export class UI {
     const cam = g.camera;
     for (let i = 0; i < this.markerEls.length; i++) {
       const e = this.markerEls[i], m = markers[i];
-      if (!m) { e.style.display = 'none'; continue; }
-      if (this.guide?.target && this.guide.target.distanceToSquared(m.pos) < 4) { e.style.display = 'none'; continue; }
+      if (!m) { setDisp(e, 'none'); continue; }
+      if (this.guide?.target && this.guide.target.distanceToSquared(m.pos) < 4) { setDisp(e, 'none'); continue; }
       const p = m.pos.clone(); p.y += 2;
       const d = p.distanceTo(cam.position);
       p.project(cam);
-      if (p.z > 1 || d < 3) { e.style.display = 'none'; continue; }
+      if (p.z > 1 || d < 3) { setDisp(e, 'none'); continue; }
       const x = clamp((p.x * 0.5 + 0.5) * window.innerWidth, 30, window.innerWidth - 30), y = clamp((-p.y * 0.5 + 0.5) * window.innerHeight, 40, window.innerHeight - 60);
-      e.style.display = 'block';
-      e.style.transform = `translate(${x}px, ${y}px)`;
-      e.innerHTML = `<div class="mi">${m.icon || '▼'}</div><div class="md">${m.label ? m.label + ' · ' : ''}${d > 1000 ? (d / 1000).toFixed(1) + ' km' : Math.round(d) + ' m'}</div>`;
+      setDisp(e, 'block');
+      e.style.transform = `translate(${x.toFixed(0)}px, ${y.toFixed(0)}px)`;
+      const html = `<div class="mi">${m.icon || '▼'}</div><div class="md">${m.label ? m.label + ' · ' : ''}${d > 1000 ? (d / 1000).toFixed(1) + ' km' : Math.round(d) + ' m'}</div>`;
+      if (html !== e._h) { e._h = html; e.innerHTML = html; }
     }
   }
 

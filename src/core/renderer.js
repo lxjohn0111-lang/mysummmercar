@@ -78,6 +78,7 @@ export class Post {
   }
   build(q) {
     const r = this.renderer;
+    this.direct = !!q.direct;
     const size = r.getDrawingBufferSize(new THREE.Vector2());
     const rt = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: q.msaa });
     if (this.composer) this.composer.dispose();
@@ -92,7 +93,6 @@ export class Post {
     this.composer.addPass(new OutputPass());
     this.final = new ShaderPass(FinalShader);
     this.composer.addPass(this.final);
-    this.direct = !!q.direct;
     this.resize();
   }
   resize() {
@@ -112,8 +112,10 @@ export class Post {
     const trail = Math.min(0.88, fx.drunk * 0.5);
     this.after.enabled = trail > 0.05;
     this.after.uniforms.damp.value = trail;
-    // Low quality: skip the post chain entirely while no screen effect is running
-    if (this.direct && fx.drunk < 0.01 && fx.fade < 0.01 && fx.hurt < 0.01 && !fx.water && fx.blur < 0.01 && fx.sleepy < 0.01) { this.renderer.setRenderTarget(null); this.renderer.render(this.scene, this.camera); return; }
+    // Low quality never uses the post chain: switching between direct and post-processed rendering makes
+    // three.js recompile every material's shader at once (a multi-second freeze). Screen effects are drawn
+    // by a cheap HTML overlay instead (see Game.renderFrame).
+    if (this.direct) { this.renderer.setRenderTarget(null); this.renderer.render(this.scene, this.camera); return; }
     this.composer.render(dt);
   }
 }

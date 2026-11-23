@@ -62,7 +62,11 @@ export class Interact {
       wallD = hit.toi;
       const t = hit.tag;
       if (t?.item) { best = { kind: 'item', ent: t.item, dist: hit.toi }; bestD = hit.toi; }
-      else if (t?.vehicle) { best = { kind: 'vehicle', vehicle: t.vehicle, dist: hit.toi, point: _p.copy(origin).addScaledVector(dir, hit.toi).clone() }; bestD = hit.toi; }
+      else if (t?.vehicle) {
+        best = { kind: 'vehicle', vehicle: t.vehicle, dist: hit.toi, point: _p.copy(origin).addScaledVector(dir, hit.toi).clone() }; bestD = hit.toi;
+        // the Ruska's collision box is bigger than its body: let the aim reach the actual panels and parts
+        if (t.vehicle === g.car) { bestD = 2.8; wallD = 2.8; }
+      }
       else if (t?.npc) { best = { kind: 'npc', npc: t.npc, dist: hit.toi }; bestD = hit.toi; }
     }
     // mesh raycast: interactables + attached car parts
@@ -78,9 +82,19 @@ export class Interact {
     if (car.root.position.distanceToSquared(origin) < 64) objs.push(car.root);
     if (car.standRoot.children.length && g.spots.engineStand.distanceToSquared(origin) < 25) objs.push(car.standRoot);
     const hits = this.ray.intersectObjects(objs, true);
+    // With a wrench or screwdriver the aim "sees through" the bodywork and other parts: the first part
+    // along the line that still has loose bolts wins (so parts under fenders, inside the engine or
+    // behind seats can always be reached). The car's own collider and shell don't block the aim.
+    if (this.tool !== 'hands') {
+      const tp = this.toolTarget(hits, origin, dir, hit && hit.tag?.vehicle === car ? 2.8 : wallD);
+      if (tp) return tp;
+    }
     for (const h of hits) {
       if (h.distance > Math.min(bestD, wallD + 0.12) + 0.02) break;
       const o = h.object;
+      // a shopkeeper standing behind their counter: talking to them wins over the counter's click box
+      // (their dialog offers the same shop), otherwise Tarja, Jussi and others could not be talked to
+      if (o.userData.interact && best?.kind === 'npc') continue;
       if (o.userData.interact) { best = { kind: 'interact', it: o.userData.interact, dist: h.distance }; break; }
       let p = o; while (p && !p.userData.partInst) p = p.parent;
       if (p) { best = { kind: 'part', inst: p.userData.partInst, dist: h.distance, point: h.point.clone() }; break; }
@@ -88,6 +102,36 @@ export class Interact {
       if (car.root === o || isChild(car.root, o)) { if (!best || h.distance < bestD) best = { kind: 'vehicle', vehicle: car, dist: h.distance, point: h.point.clone() }; break; }
     }
     return best;
+  }
+
+  toolTarget(hits, origin, dir, limit) {
+    const car = this.game.car;
+    let first = null, loose = null, sawInteract = false;
+    for (const h of hits) {
+      if (h.distance > limit + 0.12) break;
+      if (h.object.userData.interact) { sawInteract = true; continue; }
+      let p = h.object; while (p && !p.userData.partInst) p = p.parent;
+      if (!p) continue; // car shell: look through it
+      const inst = p.userData.partInst;
+      if (!inst.slot) continue;
+      if (!first) first = { inst, h };
+      if (!loose && inst.def.bolts > 0 && car.tightFrac(inst) < 0.999) loose = { inst, h };
+      if (loose) break;
+    }
+    const pick = loose || first;
+    if (pick) return { kind: 'part', inst: pick.inst, dist: pick.h.distance, point: pick.h.point.clone() };
+    if (sawInteract) return null; // looking at a stove, door, etc.: normal targeting
+    // nothing hit directly: take the part closest to the line of sight (small parts, parts inside others)
+    let best = null, bs = 0.16;
+    for (const inst of car.parts.values()) {
+      if (!inst.slot || inst.def.bolts === 0) continue;
+      const w = inst.mesh.getWorldPosition(_p);
+      const rel = w.sub(origin), along = rel.dot(dir);
+      if (along < 0.2 || along > 2.6) continue;
+      const perp = rel.addScaledVector(dir, -along).length() - (car.tightFrac(inst) < 0.999 ? 0.04 : 0);
+      if (perp < bs) { bs = perp; best = inst; }
+    }
+    return best ? { kind: 'part', inst: best, dist: 1, point: best.mesh.getWorldPosition(new THREE.Vector3()) } : null;
   }
 
   // --------------------------------------------------- handlers
@@ -172,7 +216,13 @@ export class Interact {
       } else this.prompt.keys.push(['', 'Nothing to adjust here']);
     } else {
       const cd = car.canDetach(inst);
-      if (cd.ok) { this.prompt.keys.push(['E', 'Detach']); if (inp.hit('KeyE')) { car.detach(inst); this.pickUp(inst.ent); } }
+      const hinge = car.tightFrac(inst) > 0 ? car.hingeOf(inst) : null;
+      if (hinge) {
+        const what = inst.def.type === 'hood' ? 'hood' : inst.def.type === 'trunk' ? 'trunk' : 'door';
+        this.prompt.keys.push(['E', inst.hingeOpen ? `Close the ${what}` : `Open the ${what}`]);
+        this.prompt.keys.push(['', 'Unbolt it to take it off']);
+        if (inp.hit('KeyE')) car.toggleHinge(inst);
+      } else if (cd.ok) { this.prompt.keys.push(['E', 'Detach']); if (inp.hit('KeyE')) { car.detach(inst); this.pickUp(inst.ent); } }
       else { this.prompt.keys.push(['', cd.why || '']); if (bolts > 0) this.prompt.keys.push(['F', 'Wrench']); }
       if (inst.def.tune) this.prompt.keys.push(['3', 'Screwdriver to tune']);
     }
@@ -237,7 +287,7 @@ export class Interact {
     if (def.use) this.prompt.keys.push(['E', typeof def.useLabel === 'function' ? def.useLabel(e) : def.useLabel || 'Use']);
     // part attach ghost
     if (e.part) {
-      const slot = g.car.findSlot(e.part, e.mesh.position, 0.6);
+      const slot = g.car.findSlotView(e.part, origin, dir, e.mesh.position);
       if (slot) {
         this.showGhost(e.part, slot);
         this.prompt.keys.unshift(['E', `Attach to ${SLOTS[slot].name || prettySlot(slot)}`]);
@@ -258,18 +308,24 @@ export class Interact {
         this.prompt.keys.unshift(['E', label || 'Use']);
       }
     }
+    // you can still talk to people while carrying something (e.g. to give Pertti a beer)
+    let npc = null;
+    if (!station && !this.ghost) {
+      const hit = g.physics.ray(origin, dir, 2.8, { exclude: g.player.collider, predicate: (c) => g.physics.tagOf(c)?.item !== e });
+      if (hit && hit.tag?.npc) { npc = hit.tag.npc; this.prompt.keys = this.prompt.keys.filter(([k]) => k !== 'E'); this.prompt.keys.unshift(['E', `Talk to ${npc.name}`]); }
+    }
     if (inp.mouse.leftPressed) { this.drop(); return; }
     if (inp.mouse.rightPressed) { this.throwHeld(dir); return; }
-    if (inp.hit('KeyE')) { if (station) station.use(); else if (def.use) def.use(g, e); }
+    if (inp.hit('KeyE')) { if (station) station.use(); else if (npc) g.npcs.talk(npc); else if (def.use) def.use(g, e); }
   }
 
   showGhost(inst, slot) {
     const g = this.game;
     if (this.ghostSlot !== slot || !this.ghost) {
       this.clearGhost();
-      const ghost = inst.mesh.clone(true);
-      ghost.traverse((o) => { if (o.isMesh) { o.material = GHOST_MAT; o.castShadow = false; o.userData = {}; } });
-      ghost.userData = {};
+      // Object3D.clone() JSON-copies userData, and part meshes keep a back-reference to their part
+      // (a circular structure) -> it threw every frame and froze the game. Copy the tree by hand.
+      const ghost = ghostCopy(inst.mesh);
       this.ghost = ghost; this.ghostSlot = slot;
       const parent = g.car.parentObj(slot);
       parent.add(ghost);
@@ -284,6 +340,16 @@ export class Interact {
 }
 
 const GHOST_MAT = new THREE.MeshBasicMaterial({ color: 0x40ff80, transparent: true, opacity: 0.3, depthWrite: false });
+// visual-only copy of a part (shares geometry, ghost material, no userData)
+function ghostCopy(src) {
+  let o;
+  if (src.isMesh) { o = new THREE.Mesh(src.geometry, GHOST_MAT); o.castShadow = false; o.receiveShadow = false; o.renderOrder = 5; }
+  else o = new THREE.Group();
+  o.position.copy(src.position); o.quaternion.copy(src.quaternion); o.scale.copy(src.scale);
+  o.visible = src.visible;
+  for (const c of src.children) if (c.isMesh || c.isGroup || c.type === 'Object3D') o.add(ghostCopy(c));
+  return o;
+}
 function isChild(root, o) { while (o) { if (o === root) return true; o = o.parent; } return false; }
 function partCond(inst) {
   const c = inst.cond;

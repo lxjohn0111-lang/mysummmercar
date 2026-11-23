@@ -169,8 +169,8 @@ export class Actions {
     }
     this.updateMailbox();
     // charger feedback
-    const C = g.chargerObj?.getObjectByName('chargerNeedle');
-    if (C) { const on = !!this.chargingBattery && (this.chargingBattery.data.charge ?? 0) < 1; C.rotation.z += ((on ? -0.6 + Math.sin(performance.now() / 700) * 0.04 : 0.6) - C.rotation.z) * Math.min(1, dt * 3); const led = g.chargerObj.getObjectByName('chargerLed'); led.material.emissiveIntensity = this.chargingBattery ? ((this.chargingBattery.data.charge ?? 0) >= 1 ? 2 : (Math.sin(performance.now() / 300) > 0 ? 2 : 0.2)) : 0; }
+    const C = g.chargerObj ? (this._needle ||= g.chargerObj.getObjectByName('chargerNeedle')) : null;
+    if (C) { const on = !!this.chargingBattery && (this.chargingBattery.data.charge ?? 0) < 1; C.rotation.z += ((on ? -0.6 + Math.sin(performance.now() / 700) * 0.04 : 0.6) - C.rotation.z) * Math.min(1, dt * 3); const led = (this._led ||= g.chargerObj.getObjectByName('chargerLed')); led.material.emissiveIntensity = this.chargingBattery ? ((this.chargingBattery.data.charge ?? 0) >= 1 ? 2 : (Math.sin(performance.now() / 300) > 0 ? 2 : 0.2)) : 0; }
     const rd = g.garageRadioObj?.userData.parts?.dial;
     if (rd) rd.material.emissiveIntensity = g.radio?.garageOn ? 1.2 : 0;
   }
@@ -845,7 +845,9 @@ export class Actions {
         const r = Math.random();
         const kind = r < 0.15 ? 'pike' : r < 0.6 ? 'perch' : 'roach';
         audio.play('reel', g.camera.position); audio.play('splash', g.spots.dockEnd, 0.6);
-        const e = this.spawnNear('fishRaw', g.player.pos, { data: { kind } });
+        // land the catch on the dock behind you (not in the lake)
+        const y = g.player.yaw, back = new THREE.Vector3(Math.sin(y), 0, Math.cos(y)).multiplyScalar(0.7);
+        const e = g.items.spawn('fishRaw', new THREE.Vector3(g.player.pos.x, g.player.feetY() + 0.3, g.player.pos.z).add(back), { data: { kind } });
         e.def = { ...e.def, name: { pike: 'Pike (hauki)', perch: 'Perch (ahven)', roach: 'Roach (särki)' }[kind] };
         g.ui.toast(`You caught a ${e.def.name}!`);
         g.stats.fish = (g.stats.fish || 0) + 1;

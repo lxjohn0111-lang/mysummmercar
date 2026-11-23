@@ -9,6 +9,11 @@ import { clamp, rand, lerp, damp, pick } from '../core/util.js';
 import { audio } from '../core/audio.js';
 import { tex } from '../core/assets.js';
 import { mats } from '../world/mats.js';
+import { tween } from '../core/tween.js';
+
+// bolted-on hood, trunk lid and doors swing open on their hinges (unbolted ones can be removed)
+const HINGED = { hood: -1.15, trunk: 1.2, doorL: -1.15, doorR: 1.15 };
+const _hq = new THREE.Quaternion(), _hv = new THREE.Vector3();
 
 const ENGINE_REQ = ['crank', 'piston1', 'piston2', 'piston3', 'piston4', 'gasket', 'head', 'cam', 'camgear', 'chain', 'rockers', 'flywheel', 'starter', 'dist', 'plug1', 'plug2', 'plug3', 'plug4', 'wires', 'intake', 'carb', 'fpump'];
 const BODY_REQ = ['battery', 'wiring', 'fuses', 'coil', 'tank', 'fuelline'];
@@ -259,6 +264,23 @@ export class BuildCar extends Vehicle {
     obj.updateMatrixWorld(true);
     return out.set(...this.slotPos(slotId)).applyMatrix4(obj.matrixWorld);
   }
+  // slot for a held part: either the part is close to it, or the player is looking right at it
+  findSlotView(inst, origin, dir, heldPos) {
+    let best = null, bs = 1e9;
+    for (const sid of Object.keys(SLOTS)) {
+      if (!this.slotAvailable(sid, inst)) continue;
+      const w = this.slotWorld(sid, _v);
+      if (!w) continue;
+      let score = 1e9;
+      const dh = w.distanceTo(heldPos);
+      if (dh < 0.6) score = dh;
+      _v2.copy(w).sub(origin);
+      const along = _v2.dot(dir);
+      if (along > 0.15 && along < 2.6) { const perp = _v2.addScaledVector(dir, -along).length(); if (perp < 0.3) score = Math.min(score, 0.05 + perp * 1.5); }
+      if (score < bs) { bs = score; best = sid; }
+    }
+    return best;
+  }
   // find best slot for a held part near position
   findSlot(inst, worldPos, maxDist = 0.55) {
     let best = null, bd = maxDist;
@@ -280,7 +302,7 @@ export class BuildCar extends Vehicle {
     const r = SLOTS[slotId].rot || [0, 0, 0];
     inst.mesh.rotation.set(r[0], r[1], r[2]);
     inst.mesh.scale.set(1, 1, 1);
-    inst.slot = slotId; inst.tight = tight;
+    inst.slot = slotId; inst.tight = tight; inst.hingeA = 0; inst.hingeOpen = false; inst._hingeMoved = false;
     this.slots[slotId] = inst;
     this.dirty = true;
     if (!silent) { audio.play('clunk', this.slotWorld(slotId, _v), 0.6); this.game.stats.partsAttached = (this.game.stats.partsAttached || 0) + 1; }
@@ -522,7 +544,35 @@ export class BuildCar extends Vehicle {
     this.gear = savedGear;
   }
 
+  hingeOf(inst) {
+    const t = inst?.def?.type;
+    if (!inst?.def?.panel || HINGED[t] === undefined || inst.slot !== t) return null;
+    const bb = this.panelGeos[t].geo.boundingBox;
+    if (t === 'hood') return { axis: new THREE.Vector3(1, 0, 0), H: new THREE.Vector3(0, bb.max.y, bb.min.z), open: HINGED[t] };
+    if (t === 'trunk') return { axis: new THREE.Vector3(1, 0, 0), H: new THREE.Vector3(0, bb.max.y, bb.max.z), open: HINGED[t] };
+    return { axis: new THREE.Vector3(0, 1, 0), H: new THREE.Vector3(t === 'doorL' ? bb.max.x : bb.min.x, 0, bb.max.z), open: HINGED[t] };
+  }
+  toggleHinge(inst) {
+    const h = this.hingeOf(inst); if (!h) return;
+    inst.hingeOpen = !inst.hingeOpen; inst.hingeA = inst.hingeA || 0;
+    tween(inst, 'hingeA', inst.hingeOpen ? h.open : 0, 0.7);
+    audio.play(inst.hingeOpen ? 'creak' : 'door', this.slotWorld(inst.slot, _hv), 0.7);
+  }
+  updateHinges() {
+    for (const t in HINGED) {
+      const inst = this.slots[t];
+      if (!inst || (!inst.hingeA && !inst._hingeMoved)) continue;
+      const h = this.hingeOf(inst); if (!h) continue;
+      const c = this.panelGeos[t].centre;
+      _hq.setFromAxisAngle(h.axis, inst.hingeA || 0);
+      _hv.copy(h.H).applyQuaternion(_hq);
+      inst.mesh.position.copy(c).add(h.H).sub(_hv);
+      inst.mesh.quaternion.copy(_hq);
+      inst._hingeMoved = !!inst.hingeA;
+    }
+  }
   update(dt) {
+    this.updateHinges();
     if (this.onStands && this.body) {
       // keep fixed body visuals in place
     }

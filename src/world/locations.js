@@ -185,7 +185,7 @@ function buildGarage(game) {
   B.hit(0.6, 1.8, 1.4, -2.6, 0.9, -1.6, { label: () => game.actions.hoistLabel(), use: () => game.actions.hoist() });
   const ch = PR.batteryCharger(); B.add(ch, -0.7, 0.99, -D / 2 + 0.5); game.chargerObj = ch;
   game.spots.charger = B.w(-0.7, 1.1, -D / 2 + 0.75);
-  B.hit(0.35, 0.3, 0.3, -0.7, 1.08, -D / 2 + 0.5, { label: () => game.actions.chargerLabel(), use: () => game.actions.charger() });
+  B.hit(0.35, 0.3, 0.3, -0.7, 1.08, -D / 2 + 0.5, { label: () => game.actions.chargerLabel(), use: () => game.actions.charger(), held: (e) => e.part?.defId === 'battery' });
   B.add(PR.poster('RUSKA 1300\nHUOLTO-OHJE\n\nKiristä pultit!\nÖljy 3.5 L\nVesi 5 L', 0.55, 0.8, '#f0f0e0', '#202020'), 2.2, 1.7, -D / 2 + 0.11);
   B.add(PR.poster('KURKI-SPRINT\nRALLI\nLAUANTAISIN\nklo 12-18', 0.5, 0.7, '#ffd020', '#111'), -1.6, 1.7, -D / 2 + 0.11);
   // radio on workbench
@@ -344,7 +344,7 @@ function buildVillage(game) {
     const brm = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.8, 0.7), new THREE.MeshStandardMaterial({ color: 0x2a7a3a, roughness: 0.4 }));
     brm.position.set(-5.4, 1.08, -1.8); B.group.add(brm); B.col(0.8, 1.8, 0.7, -5.4, 1.08, -1.8);
     B.add(PR.poster('PULLOPALAUTUS\npantti 0,50 mk', 0.7, 0.4, '#2a7a3a', '#fff'), -5.0, 1.5, -1.8, Math.PI / 2);
-    B.hit(0.9, 1.8, 0.9, -5.2, 1.08, -1.8, { label: 'Return bottles', use: () => game.actions.returnBottles() });
+    B.hit(0.9, 1.8, 0.9, -5.2, 1.08, -1.8, { label: 'Return bottles (0.50 mk each)', use: () => game.actions.returnBottles(), held: (e) => e.defId === 'emptyBottle' });
     B.add(PR.poster('MAKKARA\ntarjous!\n2 pkt 15 mk', 0.6, 0.8, '#ffe040', '#c02020'), 0.5, 1.6, -D / 2 + 0.12);
     B.add(PR.poster('KESÄ-\nKAMPANJA', 0.5, 0.5, '#20a0e0', '#fff'), -3.3, 2.5, -D / 2 + 0.12);
     game.spots.shopCounter = B.w(-3.0, 1.2, 1.6);

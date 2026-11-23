@@ -82,7 +82,10 @@ export class Radio {
     if (this.station === 2) return this.newsTick(dt, pos);
     // schedule ahead
     const ctx = audio.ctx;
-    while (this.nextTime < ctx.currentTime + 0.25) {
+    // never try to "catch up" on minutes of missed beats (tab in background, ads): skip ahead instead
+    if (!(this.nextTime > ctx.currentTime - 0.5)) this.nextTime = ctx.currentTime + 0.05;
+    let guard = 0;
+    while (this.nextTime < ctx.currentTime + 0.25 && guard++ < 24) {
       this.playBeat(this.nextTime);
       this.nextTime += 60 / this.song.tempo / 2; // eighth notes
       this.beat++;
