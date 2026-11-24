@@ -1,7 +1,7 @@
 {
-  "name": "kesakaara",
+  "name": "rustbucket-summer",
   "version": "1.0.0",
-  "description": "Kes\u00e4kaara \u2014 an original first-person Finnish summer garage survival game for CrazyGames",
+  "description": "Rustbucket Summer — an original first-person Finnish summer garage survival game for CrazyGames",
   "type": "module",
   "scripts": {
     "dev": "vite",

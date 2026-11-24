@@ -5,7 +5,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font
 #loading { position: fixed; inset: 0; background: radial-gradient(ellipse at 50% 40%, #2a3a2a 0%, #0c120c 70%); display: flex; align-items: center; justify-content: center; z-index: 100; transition: opacity 0.8s; }
 #loading.hide { opacity: 0; pointer-events: none; }
 .load-inner { width: min(520px, 86vw); text-align: center; color: #e8e2d0; }
-.load-title { font-size: 64px; font-weight: 900; letter-spacing: 10px; color: #f2d36b; text-shadow: 0 4px 0 #6a3a1a, 0 8px 30px rgba(0,0,0,0.6); }
+.load-title { font-size: min(64px, 11vw); line-height: 1; font-weight: 900; letter-spacing: 6px; color: #f2d36b; text-shadow: 0 4px 0 #6a3a1a, 0 8px 30px rgba(0,0,0,0.6); }
 .load-sub { font-size: 15px; letter-spacing: 4px; text-transform: uppercase; opacity: 0.7; margin: 6px 0 34px; }
 .load-bar { height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; }
 #load-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #c8a040, #f2d36b); transition: width 0.2s; }
@@ -72,8 +72,9 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font
 .overlay.dim { background: rgba(6,8,6,0.55); backdrop-filter: blur(3px); }
 .overlay.ctp-wrap { background: radial-gradient(ellipse at center, rgba(0,0,0,0.15), rgba(0,0,0,0.6)); cursor: pointer; }
 .ctp { text-align: center; max-width: 640px; padding: 20px; }
-.logo { font-size: 68px; font-weight: 900; letter-spacing: 12px; color: #f2d36b; text-shadow: 0 4px 0 #6a3a1a, 0 10px 40px rgba(0,0,0,0.7); }
-.logo.small { font-size: 40px; letter-spacing: 8px; margin-bottom: 18px; }
+.logo { font-size: min(68px, 11vw); line-height: 1; font-weight: 900; letter-spacing: 6px; color: #f2d36b; text-shadow: 0 4px 0 #6a3a1a, 0 10px 40px rgba(0,0,0,0.7); }
+.logo.small { font-size: 40px; letter-spacing: 5px; margin-bottom: 18px; }
+.logo span, .load-title span { display: block; margin-top: 0.12em; font-size: 0.46em; letter-spacing: 0.55em; text-indent: 0.55em; color: #fff1c4; }
 .tag { font-size: 14px; letter-spacing: 5px; text-transform: uppercase; color: #e8e2d0; margin: 4px 0 20px; }
 .story { font-size: 16px; line-height: 1.6; color: #f4eedc; background: rgba(0,0,0,0.35); padding: 14px 18px; border-radius: 10px; }
 .story b { color: #f2d36b; }

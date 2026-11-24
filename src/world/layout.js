@@ -1,4 +1,4 @@
-// Map definition for the original world of "Kesäkaara": the lakeside countryside around Kurkijärvi.
+// Map definition for the original world of "Rustbucket Summer": the lakeside countryside around Kurkijärvi.
 // Coordinates: x = east, z = south (north = -z). Units: metres.
 import { fbm2, ridged2, smoothstep, perlin2 } from '../core/noise.js';
 

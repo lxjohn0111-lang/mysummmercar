@@ -255,7 +255,7 @@ export class UI {
 
   clickToPlay(first) {
     const o = this.showOverlay(`<div class="ctp">
-      ${first ? `<div class="logo">KESÄKAARA</div><div class="tag">Summer 1997 · Kurkijärvi, Finland</div>
+      ${first ? `<div class="logo">RUSTBUCKET<span>SUMMER</span></div><div class="tag">Summer 1997 · Kurkijärvi, Finland</div>
       <div class="story">Your uncle left for a job on the oil rigs and left you his house by the lake, a tired old van, a moped — and a <b>Ruska 1300</b> in a hundred pieces in the garage. Build it. Register it. Win the Saturday rally. Try not to die.</div>` : '<div class="logo small">PAUSED</div>'}
       <div class="go">${first ? (IS_MOBILE ? 'Tap to start your summer' : 'Click to start your summer') : (IS_MOBILE ? 'Tap to continue' : 'Click to continue')}</div>${IS_MOBILE ? '<div class="rot">📱↻ Turn your phone sideways for the best view</div>' : ''}</div>`, 'ctp-wrap');
     o.onclick = () => { this.game.resume(); };
@@ -264,7 +264,7 @@ export class UI {
   pauseMenu() {
     const g = this.game;
     const o = this.showOverlay(`<div class="menu">
-      <div class="logo small">KESÄKAARA</div>
+      <div class="logo small">RUSTBUCKET<span>SUMMER</span></div>
       <button data-a="resume">Resume</button>
       <button data-a="save">Save game</button>
       <button data-a="settings">Settings</button>

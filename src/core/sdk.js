@@ -1,5 +1,5 @@
 // CrazyGames SDK v3 wrapper. Works without the SDK (local dev / blocked script) by falling back to no-ops + localStorage.
-const LS_PREFIX = 'kesakaara:';
+const LS_PREFIX = 'kesakaara:'; // old internal name kept so existing saves still load
 
 class CrazySDK {
   constructor() {

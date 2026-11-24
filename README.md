@@ -1,4 +1,4 @@
-# Kesäkaara — a Finnish summer garage sim
+# Rustbucket Summer — a Finnish summer garage sim
 
 An original first-person browser game for CrazyGames: summer 1997 by a lake in the Finnish countryside. You inherit your uncle's house, a tired van, a moped and a **Ruska 1300** coupé in about a hundred pieces in the garage. Build the car, get it through inspection, win the Saturday gravel rally, and survive everyday life along the way: hunger, thirst, sleep, sauna, beer, jobs, police and moose.
 

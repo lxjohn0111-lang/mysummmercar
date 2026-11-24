@@ -1,5 +1,5 @@
 // Builds the CrazyGames upload: ONE self-contained index.html (game code, three.js, Rapier physics,
-// CSS and every texture inlined), zipped as crazygames/kesakaara-crazygames.zip.
+// CSS and every texture inlined), zipped as crazygames/rustbucket-summer-crazygames.zip.
 //   node tools/make-crazygames.mjs
 import { build } from 'vite';
 import fs from 'node:fs';
@@ -56,13 +56,14 @@ html = html
   .replace('</head>', `<style>${css}</style>\n</head>`)
   .replace('</body>', `<script>window.__TEX=${JSON.stringify(tex)};</script>\n<script type="module">${js}</script>\n</body>`);
 fs.mkdirSync(outDir, { recursive: true });
-const single = path.join(outDir, 'index.html');
+const single = path.join(tmp, 'index.html'); // only the zip lands in crazygames/
 fs.writeFileSync(single, html);
 
 // 4) zip it (index.html at the zip root)
-const zip = path.join(outDir, 'kesakaara-crazygames.zip');
+const zip = path.join(outDir, 'rustbucket-summer-crazygames.zip');
 fs.rmSync(zip, { force: true });
 execFileSync('zip', ['-9', '-j', '-q', zip, single]);
+const htmlSize = fs.statSync(single).size;
 fs.rmSync(tmp, { recursive: true, force: true });
 const mb = (n) => (n / 1048576).toFixed(2) + ' MB';
-console.log(`textures ${mb(raw)} -> ${mb(packed)}; index.html ${mb(fs.statSync(single).size)}; zip ${mb(fs.statSync(zip).size)}`);
+console.log(`textures ${mb(raw)} -> ${mb(packed)}; index.html ${mb(htmlSize)}; zip ${mb(fs.statSync(zip).size)}`);

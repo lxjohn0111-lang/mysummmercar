@@ -38,7 +38,7 @@ if (local) {
 }
 
 const css = fs.readFileSync('src/style.css', 'utf8');
-const page = `<title>Kesäkaara</title>
+const page = `<title>Rustbucket Summer</title>
 <style>
 ${css}
 </style>
@@ -46,7 +46,7 @@ ${css}
 <div id="ui"></div>
 <div id="loading">
   <div class="load-inner">
-    <div class="load-title">KESÄKAARA</div>
+    <div class="load-title">RUSTBUCKET<span>SUMMER</span></div>
     <div class="load-sub">a Finnish summer garage survival</div>
     <div class="load-bar"><div id="load-fill"></div></div>
     <div id="load-text">Starting up…</div>
