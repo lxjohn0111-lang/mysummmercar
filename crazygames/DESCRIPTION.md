@@ -56,4 +56,4 @@ Car, Driving, Simulator, Building, Survival, Sandbox, 3D, First Person, Open Wor
 - Upload `rustbucket-summer-crazygames.zip`: it contains a single `index.html` (everything is embedded; the only external file is the CrazyGames SDK script).
 - Orientation: landscape (works on desktop, tablet and mobile).
 - The CrazyGames SDK v3 is integrated: loading start/stop, gameplay start/stop, midgame and rewarded ads (rewarded ad revives you after death), happy time on big moments, data save via the SDK, mute setting respected.
-- Videos: `video-landscape-1920x1080.mp4` and `video-portrait-1080x1920.mp4` (15 s, no audio).
+- Videos: `video-landscape-1920x1080.mp4` and `video-portrait-1080x1620.mp4` (15 s, no audio; 1080x1920 version also included).
