@@ -66,7 +66,7 @@ export class Game {
     this.fx = { drunk: 0, fade: 1, hurt: 0, water: 0, blur: 0, sleepy: 0, heat: 0 };
     this.sdk = SDK;
     this.audio = audio;
-    this.settings = { quality: 2, sensitivity: 1, fov: 72, volume: 0.8, music: 0.6, invertY: false, autoClutch: true };
+    this.settings = { quality: IS_MOBILE ? 0 : 2, sensitivity: 1, fov: 72, volume: 0.8, music: 0.6, invertY: false, autoClutch: true };
     this.saveTimer = 180;
     this.mailHour = -1;
   }
@@ -298,7 +298,7 @@ export class Game {
   // ---------------------------------------------------------------- new world
   newWorld() {
     const g = this;
-    this.state = { money: 650, firewood: 30, mail: [], bills: 0 };
+    this.state = { money: 900, firewood: 30, mail: [], bills: 0 };
     this.stats = {}; this.achievements = {};
     this.time.minutes = 9 * 60 + 5;
     const car = this.car;
@@ -352,8 +352,9 @@ export class Game {
     // player
     this.player.teleport(this.spots.garage.clone().add(new THREE.Vector3(-1.0, 0.1, 6.8)), 0);
     this.garageDoor.toggle();
+    { const d = this.garageDoor; d.angle = d.target; d.pivot.rotation.x = d.angle; } // already open on the first frame
     this.sky.setWeatherNow({ clouds: 0.3, rain: 0, wind: 0.3, storm: 0 });
-    this.state.mail = [{ kind: 'gift', uncle: true, title: 'Letter from your uncle', text: 'Hi kid! The Ruska is in the garage. All the parts are there, mostly. Spark plugs are shot and you\'ll need a fan belt and an oil filter from Rautala. Battery needs charging. Keys are in the ignition. Don\'t burn the house down. — Uncle Veikko<br><br>P.S. here is some money for parts.', amount: 300 }];
+    this.state.mail = [{ kind: 'gift', uncle: true, title: 'Letter from your uncle', text: 'Hi kid! The Ruska is in the garage. All the parts are there, mostly. Spark plugs are shot and you\'ll need a fan belt and an oil filter from Rautala. Battery needs charging. Keys are in the ignition. Don\'t burn the house down. — Uncle Veikko<br><br>P.S. here is some money for parts.', amount: 500 }];
   }
 
   layoutGarageParts(insts) {
@@ -465,7 +466,7 @@ export class Game {
       for (const e of data.car.parts) {
         const inst = car.createPart(e.defId, { cond: e.cond, data: e.data, uid: e.uid });
         if (!inst) continue;
-        inst.tight = e.tight;
+        inst.tight = Math.min(e.tight, car.maxTight(inst));
         if (e.slot) pending.push([inst, e.slot, e.tight]);
         else { const pos = e.pos ? new THREE.Vector3(...e.pos) : this.spots.partsArea.floor.clone().add(new THREE.Vector3(0, 1, 0)); car.spawnLoose(inst, pos, e.rot ? new THREE.Quaternion(...e.rot) : null); }
       }
@@ -499,7 +500,7 @@ export class Game {
       this.player.teleport(new THREE.Vector3(...data.player.p), data.player.yaw);
       if (data.sauna) { this.sauna.wood = data.sauna.wood || 0; this.sauna.temp = data.sauna.temp || 20; }
       if (data.weather) this.sky.setWeatherNow(data.weather);
-      if (data.garageDoor) this.garageDoor.toggle();
+      if (data.garageDoor) { this.garageDoor.toggle(); const d = this.garageDoor; d.angle = d.target; d.pivot.rotation.x = d.angle; }
       if (this.state.logOnBlock) this.actions.blockLog(true);
       return true;
     } catch (e) {

@@ -44,7 +44,7 @@ export class Jobs {
       const ent = g.items.spawn('hayBale', new THREE.Vector3(x, g.terrain.getHeight(x, z) + 0.8, z), { rot: { x: 0, y: Math.sin(i), z: 0, w: Math.cos(i) } });
       bales.push({ ent, done: false });
     }
-    this.active = { type: 'hay', bales, delivered: 0, pay: 70 };
+    this.active = { type: 'hay', bales, delivered: 0, pay: 95 };
     g.ui.objective('Hay job: bales to the barn', 'Take the tractor. Drive the fork into a bale, lift it with {R}, bring it to the barn and lower it with {F}.');
   }
   updateHay(dt) {
@@ -93,7 +93,7 @@ export class Jobs {
       const mb = g.makeMailbox(pos);
       stops.push({ pos, done: false, mb });
     }
-    this.active = { type: 'paper', stops, start: g.time.minutes, pay: 22 };
+    this.active = { type: 'paper', stops, start: g.time.minutes, pay: 35 };
     g.ui.objective('Newspaper round', 'Stop at each mailbox and press {E}. Faster = bonus.');
   }
   updatePaper(dt) {
@@ -140,7 +140,7 @@ export class Jobs {
       const p = van.toWorld(lp);
       crates.push(g.items.spawn('deliveryBox', p, { data: { dest: d.name } }));
     }
-    this.active = { type: 'delivery', dest: d.pos.clone(), destName: d.name, crates, pay: 85 };
+    this.active = { type: 'delivery', dest: d.pos.clone(), destName: d.name, crates, pay: 120 };
     g.ui.objective(`Delivery to ${d.name}`, 'The 4 crates are in your van. Drive there, then carry them to the marker.');
   }
   updateDelivery(dt) {
@@ -159,7 +159,7 @@ export class Jobs {
   // ---------------------------------------------------------------- taxi for Pertti
   startTaxi(vehicle, destName, dest) {
     const g = this.game;
-    this.active = { type: 'taxi', vehicle, dest: dest.clone(), destName, pay: Math.round(rand(40, 90)), t: 0, comment: 8 };
+    this.active = { type: 'taxi', vehicle, dest: dest.clone(), destName, pay: Math.round(rand(70, 130)), t: 0, comment: 8 };
     g.npcs.givePerttiRide(vehicle);
     g.ui.objective(`Taxi: Pertti to ${destName}`, 'Drive gently or he will throw up.');
   }

@@ -26,7 +26,9 @@ export function tex(name, { srgb = true, repeat = [1, 1], wrap = true } = {}) {
   let t = cache.get(key);
   if (!t) {
     pending++;
-    t = loader.load(`./textures/${name}`, (tt) => { try { shrink(tt); } catch (e) {} done++; }, undefined, () => { done++; console.warn('texture failed', name); });
+    // the single-file CrazyGames build embeds every texture as a data URI in window.__TEX
+    const url = (typeof window !== 'undefined' && window.__TEX && window.__TEX[name]) || `./textures/${name}`;
+    t = loader.load(url, (tt) => { try { shrink(tt); } catch (e) {} done++; }, undefined, () => { done++; console.warn('texture failed', name); });
     t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
     if (wrap) t.wrapS = t.wrapT = THREE.RepeatWrapping;
     t.anisotropy = IS_MOBILE ? 2 : maxAniso;

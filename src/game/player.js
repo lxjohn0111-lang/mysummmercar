@@ -195,11 +195,12 @@ export class Player {
     if (this.sleeping) return;
     const m = gameDt; // game minutes elapsed
     const active = this.inVehicle ? 0.8 : 1;
-    n.hunger = clamp(n.hunger + m * (100 / (16 * 60)) * active, 0, 100);
-    n.thirst = clamp(n.thirst + m * (100 / (11 * 60)) * (1 + n.heat / 100), 0, 100);
-    n.fatigue = clamp(n.fatigue + m * (100 / (19 * 60)) * (1 + n.drunk * 0.5), 0, 100);
-    n.bladder = clamp(n.bladder + m * (100 / (14 * 60)), 0, 100);
-    n.dirt = clamp(n.dirt + m * (100 / (40 * 60)), 0, 100);
+    // easy-going rates: needs matter, but they don't keep interrupting the fun
+    n.hunger = clamp(n.hunger + m * (100 / (26 * 60)) * active, 0, 100);
+    n.thirst = clamp(n.thirst + m * (100 / (18 * 60)) * (1 + n.heat / 100), 0, 100);
+    n.fatigue = clamp(n.fatigue + m * (100 / (28 * 60)) * (1 + n.drunk * 0.5), 0, 100);
+    n.bladder = clamp(n.bladder + m * (100 / (22 * 60)), 0, 100);
+    n.dirt = clamp(n.dirt + m * (100 / (60 * 60)), 0, 100);
     // alcohol burns off ~0.15 per game hour
     n.drunk = Math.max(0, n.drunk - m * (0.13 / 60));
     // stress dynamics
@@ -210,10 +211,10 @@ export class Player {
     n.stress = clamp(n.stress + ds * m, 0, 100);
     // health
     let dh = 0;
-    if (n.hunger >= 100) dh -= 0.25; if (n.thirst >= 100) dh -= 0.45;
+    if (n.hunger >= 100) dh -= 0.12; if (n.thirst >= 100) dh -= 0.2;
     if (n.heat > 85) dh -= (n.heat - 85) * 0.08;
     if (n.drunk > 1.25) dh -= (n.drunk - 1.25) * 3;
-    if (dh === 0 && n.hunger < 80 && n.thirst < 80) dh = 0.05;
+    if (dh === 0 && n.hunger < 85 && n.thirst < 85) dh = 0.12;
     n.health = clamp(n.health + dh * m, 0, 100);
     if (n.health <= 0) {
       const cause = n.thirst >= 100 ? 'died of thirst' : n.hunger >= 100 ? 'starved to death' : n.heat > 85 ? 'overheated in the sauna' : n.drunk > 1.25 ? 'drank yourself to death' : 'collapsed';

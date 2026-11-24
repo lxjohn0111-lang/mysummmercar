@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { clamp } from '../core/util.js';
 import { audio } from '../core/audio.js';
 import { SLOTS } from '../vehicles/parts.js';
+import { TURNS_PER_BOLT } from '../vehicles/buildcar.js';
 
 // Aiming, carrying, using and wrenching.
 export class Interact {
@@ -186,7 +187,7 @@ export class Interact {
     const g = this.game, inp = g.input, inst = T.inst, car = g.car;
     const max = car.maxTight(inst);
     const bolts = inst.def.bolts;
-    const tightBolts = Math.floor(inst.tight / 8);
+    const tightBolts = Math.min(bolts, Math.floor(inst.tight / TURNS_PER_BOLT));
     this.prompt.main = inst.def.name + partCond(inst);
     if (bolts > 0) this.prompt.sub = `Bolts ${tightBolts}/${bolts}` + (inst.tight > 0 && inst.tight < max ? ` (${Math.round(inst.tight / max * 100)}%)` : inst.tight >= max ? ' ✓ tight' : '');
     // fluid info for relevant parts

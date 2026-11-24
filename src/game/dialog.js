@@ -21,7 +21,7 @@ export class Dialog {
     switch (n.id) {
       case 'tarja':
         opts.push({ label: 'I\'d like to buy something', fn: () => A.shop('shop') });
-        if (!g.jobs.active) opts.push({ label: 'Any work? (newspaper round)', fn: () => { n.say('The paper boy quit again. Deliver these to 8 mailboxes, 22 marks each.'); g.jobs.startPaper(); for (let i = 0; i < 3; i++) A.spawnNear('newspaper', g.spots.shopDrop); } });
+        if (!g.jobs.active) opts.push({ label: 'Any work? (newspaper round)', fn: () => { n.say('The paper boy quit again. Deliver these to 8 mailboxes, 35 marks each.'); g.jobs.startPaper(); for (let i = 0; i < 3; i++) A.spawnNear('newspaper', g.spots.shopDrop); } });
         break;
       case 'kaija': opts.push({ label: 'A drink, please', fn: () => A.shop('pub') }); break;
       case 'leena': opts.push({ label: 'Buy something', fn: () => A.shop('kiosk') }); break;
@@ -39,7 +39,7 @@ export class Dialog {
       case 'jari': opts.push({ label: 'About the rally...', fn: () => A.rallyOffice() }); break;
       case 'aune': {
         const day = Math.floor(g.time.minutes / 1440);
-        if (!g.jobs.active && g.state.hayDay !== day) opts.push({ label: 'Can I help with the hay?', fn: () => { g.state.hayDay = day; n.say('Oh bless you! The tractor is in the shed. Bring the bales to the barn. 70 marks each!'); g.jobs.startHay(); } });
+        if (!g.jobs.active && g.state.hayDay !== day) opts.push({ label: 'Can I help with the hay?', fn: () => { g.state.hayDay = day; n.say('Oh bless you! The tractor is in the shed. Bring the bales to the barn. 95 marks each!'); g.jobs.startHay(); } });
         const wood = g.items.list.filter((e) => e.defId === 'firewood' && e.mesh.position.distanceTo(n.pos) < 8);
         opts.push({ label: `Sell firewood (${wood.length} pcs nearby, 8 mk each)`, fn: () => {
           if (!wood.length) { n.say('Bring firewood and put it down near me, dear.'); return; }

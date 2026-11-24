@@ -3,3 +3,5 @@ dist
 *.log
 .DS_Store
 build-artifact
+build-crazygames
+crazygames/index.html

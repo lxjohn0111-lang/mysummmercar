@@ -12,6 +12,7 @@ import { mats } from '../world/mats.js';
 import { tween } from '../core/tween.js';
 
 // bolted-on hood, trunk lid and doors swing open on their hinges (unbolted ones can be removed)
+export const TURNS_PER_BOLT = 4; // wrench clicks per bolt (was 8: too grindy)
 const HINGED = { hood: -1.15, trunk: 1.2, doorL: -1.15, doorR: 1.15 };
 const _hq = new THREE.Quaternion(), _hv = new THREE.Vector3();
 
@@ -212,7 +213,7 @@ export class BuildCar extends Vehicle {
     this.applyCondVisual(inst);
     return inst;
   }
-  maxTight(inst) { return Math.max(1, inst.def.bolts * 8); }
+  maxTight(inst) { return Math.max(1, inst.def.bolts * TURNS_PER_BOLT); }
   tightFrac(inst) { return inst.def.bolts === 0 ? 1 : inst.tight / this.maxTight(inst); }
 
   // spawn a part loose in the world
@@ -355,7 +356,7 @@ export class BuildCar extends Vehicle {
     inst.tight = clamp(inst.tight + dir * step, 0, max);
     if (inst.tight === before) return false;
     const p = inst.mesh.getWorldPosition(_v);
-    if (Math.floor(inst.tight / 8) !== Math.floor(before / 8) && dir > 0) audio.play('boltTight', p);
+    if (Math.floor(inst.tight / TURNS_PER_BOLT) !== Math.floor(before / TURNS_PER_BOLT) && dir > 0) audio.play('boltTight', p);
     else audio.play('ratchet', p);
     if (inst.tight === max && dir > 0) this.game.actions?.partBolted?.(inst);
     this.dirty = true;
@@ -520,9 +521,9 @@ export class BuildCar extends Vehicle {
     return p;
   }
   startTime() {
-    let t = 0.6 + rand(0, 0.5);
-    if (this.engineTemp < 40 && !this.choke) t += 1.6 + rand(0, 1.5);
-    const s = this.engineStats(); t += s.misfire * 3;
+    let t = 0.5 + rand(0, 0.4);
+    if (this.engineTemp < 40 && !this.choke) t += 0.5 + rand(0, 0.5); // cold start: a little longer
+    const s = this.engineStats(); t += s.misfire * 1.2;
     return t;
   }
   onStart() {

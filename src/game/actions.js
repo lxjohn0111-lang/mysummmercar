@@ -409,7 +409,7 @@ export class Actions {
     const target = g.interact.lastAimPart || this.aimedPart();
     const cam = g.camera.position;
     const near = (slot) => car.slots[slot] && car.slots[slot].mesh.getWorldPosition(new THREE.Vector3()).distanceTo(cam) < 2.2;
-    let amt = Math.min(e.data.amount, 0.5);
+    let amt = Math.min(e.data.amount, 1.0);
     let msg = null;
     if (def.fluid === 'oil') {
       if (!near('rcover') && !near('head')) { g.ui.toast('Aim at the engine (the oil filler is on the rocker cover).'); return true; }
@@ -421,7 +421,7 @@ export class Actions {
       car.coolant += amt; e.data.amount -= amt; msg = `Coolant ${car.coolant.toFixed(1)} / 5 L`;
     } else if (def.fluid === 'brake') {
       if (!near('brakemaster')) { g.ui.toast('Aim at the brake master cylinder (driver side, at the firewall).'); return true; }
-      amt = Math.min(0.1, e.data.amount, 0.5 - car.brakeFluid); if (amt <= 0) { g.ui.toast('Brake fluid is full.'); return true; }
+      amt = Math.min(0.25, e.data.amount, 0.5 - car.brakeFluid); if (amt <= 0) { g.ui.toast('Brake fluid is full.'); return true; }
       car.brakeFluid += amt; e.data.amount -= amt; msg = `Brake fluid ${(car.brakeFluid * 1000).toFixed(0)} / 500 ml`;
     } else if (def.fluid === 'fuel') {
       // car tank or other vehicles
@@ -532,7 +532,7 @@ export class Actions {
   }
   updateCharger(gameDt) {
     const b = this.chargingBattery;
-    if (b) b.data.charge = Math.min(1, (b.data.charge ?? 0) + gameDt / 180);
+    if (b) b.data.charge = Math.min(1, (b.data.charge ?? 0) + gameDt / 50); // about a minute of real time
   }
   garageRadio(pos) {
     const r = this.g.radio;
@@ -557,7 +557,7 @@ export class Actions {
   exitVehicle(force = false) {
     const g = this.g, p = g.player, v = p.inVehicle;
     if (!v) return;
-    if (!force && v.speedKmh > 12) { g.ui.toast('Slow down first!'); return; }
+    if (!force && v.speedKmh > 20) { g.ui.toast('Slow down first!'); return; }
     // find a free exit spot
     let ex = v.exitWorld();
     for (const off of [0, 1, -1, 2]) {

@@ -19,7 +19,7 @@ function fitPart(type, slots, label) {
       if (s) {
         const inst = car.slots[s];
         if (car.tightFrac(inst) >= 0.999) return { done: true };
-        const tb = Math.floor(inst.tight / 8), nb = inst.def.bolts;
+        const nb = inst.def.bolts, tb = Math.min(nb, Math.floor(inst.tight / (car.maxTight(inst) / Math.max(1, nb))));
         return { target: inst.mesh.getWorldPosition(new THREE.Vector3()), radius: 3.5, always: true,
           text: `Tighten the bolts: press {F} for the wrench, aim at the ${label} and use {WHEEL}. (${tb}/${nb} bolts)` };
       }
@@ -55,13 +55,13 @@ const STEPS = [
     id: 'mailbox', title: 'Check the mailbox', target: (g) => g.spots.mailbox, radius: 3.5,
     text: 'Look at the blue mailbox and press {E}. It opens and you can read the letter. Take the money!',
     farText: 'Your uncle left a letter. The mailbox is by the road.',
-    done: (g) => !!g.state.tutFlags?.letter || !(g.state.mail || []).some((m) => m.uncle), reward: 20,
+    done: (g) => !!g.state.tutFlags?.letter || !(g.state.mail || []).some((m) => m.uncle), reward: 30,
   },
-  { id: 'garage', title: 'Go to the garage', target: (g) => g.spots.garage.clone().add(new THREE.Vector3(0, 0, 3)), radius: 5, text: 'This is your Ruska 1300. It is in pieces. You will build it, part by part!', autoArrive: 4, reward: 25 },
-  { id: 'list', title: 'Open the car list', always: true, text: 'Press {TAB} to open the car list. It shows every part the car still needs. Press {TAB} again to close it.', done: (g) => g.tutSheetSeen, reward: 15 },
-  { id: 'strut', title: 'Fit your first part', fit: fitPart('strut', ['strutFL', 'strutFR'], 'front strut (the spring)'), reward: 40 },
-  { id: 'disc', title: 'Fit a brake disc', fit: fitPart('disc', ['discFL', 'discFR'], 'brake disc'), reward: 40 },
-  { id: 'wheel', title: 'Put a wheel on', fit: fitPart('wheel', ['wheelFL', 'wheelFR'], 'wheel'), reward: 60 },
+  { id: 'garage', title: 'Go to the garage', target: (g) => g.spots.garage.clone().add(new THREE.Vector3(0, 0, 3)), radius: 5, text: 'This is your Ruska 1300. It is in pieces. You will build it, part by part!', autoArrive: 4, reward: 40 },
+  { id: 'list', title: 'Open the car list', always: true, text: 'Press {TAB} to open the car list. It shows every part the car still needs. Press {TAB} again to close it.', done: (g) => g.tutSheetSeen, reward: 20 },
+  { id: 'strut', title: 'Fit your first part', fit: fitPart('strut', ['strutFL', 'strutFR'], 'front strut (the spring)'), reward: 60 },
+  { id: 'disc', title: 'Fit a brake disc', fit: fitPart('disc', ['discFL', 'discFR'], 'brake disc'), reward: 60 },
+  { id: 'wheel', title: 'Put a wheel on', fit: fitPart('wheel', ['wheelFL', 'wheelFR'], 'wheel'), reward: 90 },
   {
     id: 'lunch', title: 'Time for lunch',
     dyn(g) {
@@ -73,7 +73,7 @@ const STEPS = [
       if ((g.state.fridge?.sausage || 0) > 0) return { target: g.home.fridge.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 1.0, 0)), radius: 2.6, text: 'Open the fridge with {E} and take a sausage.', farText: 'There is food in the fridge at home.' };
       return { target: g.spots.shopFront, radius: 6, text: 'No food at home. Buy some at the village shop.' };
     },
-    done: (g) => (g.stats.meals || 0) > 0, reward: 30,
+    done: (g) => (g.stats.meals || 0) > 0, reward: 45,
   },
   {
     id: 'van', title: 'Take the van',
@@ -81,17 +81,17 @@ const STEPS = [
       if (g.player.inVehicle === g.van) return { always: true, text: 'Hold {I} to start the engine. {W} gas, {S} brake, {AD} steer.' };
       return { target: g.van.pos.clone(), radius: 4, text: 'Press {E} to get into the van.' };
     },
-    done: (g) => g.player.inVehicle === g.van && g.van.engineOn, reward: 30,
+    done: (g) => g.player.inVehicle === g.van && g.van.engineOn, reward: 45,
   },
   {
     id: 'village', title: 'Drive to the village shop', target: (g) => g.spots.shopFront, radius: 14, drive: true,
     text: 'Park here. Press {E} to get out and walk into the shop.', farText: 'Follow the arrows to Kurkimäki village. {M} opens the map.',
-    done: (g) => !g.player.inVehicle && g.player.pos.distanceTo(g.spots.shopkeeper) < 9, reward: 40,
+    done: (g) => !g.player.inVehicle && g.player.pos.distanceTo(g.spots.shopkeeper) < 9, reward: 60,
   },
   {
     id: 'tarja', title: 'Ask for work', jobOk: true, target: (g) => g.spots.shopkeeper, radius: 3.8,
     text: 'Talk to Tarja ({E}). Choose "Any work?"', farText: 'Find Tarja behind the counter.',
-    done: (g) => g.jobs.active?.type === 'paper' || (g.stats.jobs || 0) > 0, reward: 20,
+    done: (g) => g.jobs.active?.type === 'paper' || (g.stats.jobs || 0) > 0, reward: 30,
   },
   {
     id: 'paper', title: 'Deliver the newspapers', jobOk: true,
@@ -100,12 +100,12 @@ const STEPS = [
       if (!m) return { always: true, text: 'Finish the job to get paid.' };
       return { target: m.pos, radius: 6, drive: true, text: 'Stop next to the mailbox and press {E}.', farText: 'Drive to the next mailbox. Follow the arrows.' };
     },
-    done: (g) => (g.stats.jobs || 0) > 0, reward: 60,
+    done: (g) => (g.stats.jobs || 0) > 0, reward: 90,
   },
   {
     id: 'parts', title: 'Buy the missing parts', target: (g) => g.spots.partsClerk, radius: 4.5, drive: true,
     text: 'Talk to Jussi ({E}). Buy 4 spark plugs, a fan belt and an oil filter.', farText: 'Drive to the parts store in Rautala. {M} opens the map. (Or order by phone at home.)',
-    done: (g) => hasGoodPart(g, 'plug', 4) && hasGoodPart(g, 'belt') && hasGoodPart(g, 'oilfilter'), reward: 50,
+    done: (g) => hasGoodPart(g, 'plug', 4) && hasGoodPart(g, 'belt') && hasGoodPart(g, 'oilfilter'), reward: 75,
   },
   {
     id: 'build', title: 'Finish the Ruska',
@@ -115,17 +115,17 @@ const STEPS = [
       const next = probs[0] ? `Next: ${probs[0]}.` : 'Hold {I} in the car to start it.';
       return { target: g.car.onStands ? g.spots.garage.clone() : g.car.pos.clone(), radius: 6, always: true, progress: c.pct, text: `Fit and tighten every part (${Math.round(c.pct * 100)}%). {TAB} shows what is missing. ${next}` };
     },
-    done: (g) => !!g.state.carStartedOnce, reward: 200,
+    done: (g) => !!g.state.carStartedOnce, reward: 300,
   },
   {
     id: 'inspect', title: 'Pass the inspection', target: (g) => g.spots.inspectionBay, radius: 8, drive: true,
     text: 'Park the Ruska inside the hall and talk to Inspector Mattila ({E}).', farText: 'Drive the Ruska to the inspection hall in Rautala.',
-    done: (g) => g.car.registered, reward: 150,
+    done: (g) => g.car.registered, reward: 225,
   },
   {
     id: 'rally', title: 'Drive a rally stage', target: (g) => g.spots.rallyDesk, radius: 5, drive: true,
     text: 'Talk to Jari ({E}). Practice is free any day; the real race is Saturday 12–18.', farText: 'Drive to the rally office in the north-west forest.',
-    done: (g) => !!g.achievements.rally1, reward: 100,
+    done: (g) => !!g.achievements.rally1, reward: 150,
   },
 ];
 

@@ -109,8 +109,8 @@ export class Traffic {
     const g = this.game, r = [];
     if (!v) return r;
     const onPublic = v.surfaces.some((s) => s === 'asphalt');
-    if (v.speedKmh > 98) r.push({ id: 'speed', text: `speeding (${Math.round(v.speedKmh)} km/h in an 80 zone)`, fine: Math.round(80 + (v.speedKmh - 80) * 6) });
-    if (v.isBuildCar && !v.registered && onPublic) r.push({ id: 'plates', text: 'driving an unregistered vehicle', fine: 400 });
+    if (v.speedKmh > 105) r.push({ id: 'speed', text: `speeding (${Math.round(v.speedKmh)} km/h in an 80 zone)`, fine: Math.round(80 + (v.speedKmh - 80) * 6) });
+    if (v.isBuildCar && !v.registered && onPublic) r.push({ id: 'plates', text: 'driving an unregistered vehicle', fine: 150 });
     if (v.kind === 'tractor' && v.speedKmh > 45) r.push({ id: 'tractor', text: 'tractor doing ' + Math.round(v.speedKmh) + ' km/h', fine: 150 });
     if (g.sky.daylight < 0.5 && !v.lights && v.speedKmh > 20) r.push({ id: 'lights', text: 'driving without headlights', fine: 120 });
     if (v.isBuildCar && v.engineStats().exhaust > 1.0) r.push({ id: 'noise', text: 'illegal exhaust noise', fine: 200 });
@@ -139,7 +139,7 @@ export class Traffic {
         if (P.timer <= 0) { P.state = 'patrol'; P.timer = rand(200, 400); }
       }
       // detection
-      if (pv && P.alertCooldown <= 0 && pv.pos.distanceTo(pc.pos) < (P.state === 'trap' ? 55 : 35)) {
+      if (pv && P.alertCooldown <= 0 && pv.pos.distanceTo(pc.pos) < (P.state === 'trap' ? 38 : 22)) {
         const r = this.violations(pv);
         if (r.length) this.startPursuit(r);
       }
@@ -191,7 +191,7 @@ export class Traffic {
   }
   endPursuit() {
     const P = this.pol;
-    P.state = 'patrol'; P.timer = rand(200, 400); P.alertCooldown = 60;
+    P.state = 'patrol'; P.timer = rand(200, 400); P.alertCooldown = 180;
     if (P.sirenSnd) { P.sirenSnd.stop(); P.sirenSnd = null; }
     this.game.ui.objective(null);
     // snap back to the road
